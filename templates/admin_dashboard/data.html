@@ -1,0 +1,31 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Agricultural Data{% endblock %}
+{% block page_title %}Agricultural Data{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Provenance and quality</span><h1>Data sources, datasets, and crop catalog</h1><p>Manage traceable metadata before observations are imported or shown to users.</p></div>
+  <div class="form-actions"><a class="btn btn-outline-brand" href="{% url 'administration:data_source_create' %}">Add source</a><a class="btn btn-outline-brand" href="{% url 'administration:dataset_create' %}">Add dataset</a><a class="btn btn-brand" href="{% url 'administration:crop_create' %}">Add crop</a></div>
+</div>
+
+<div class="split-grid">
+  <section class="app-card"><h2 style="font-size:1.2rem">Import validated CSV</h2><p>Imports are transactional. Invalid rows create a failed job record and no observations are partially accepted.</p><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ upload_form.as_p }}<button class="btn btn-brand" type="submit">Validate and import</button></form></section>
+  <aside class="app-card"><span class="eyebrow">Required columns</span><h2 style="font-size:1.2rem">CSV schemas</h2><p><strong>Historical weather</strong><br><code>district,date</code> plus optional rainfall, temperatures, humidity, upazila, and quality fields.</p><p><strong>Crop observations</strong><br><code>district,crop_name,year</code> plus optional production, yield, area, variety, season, and quality fields.</p><p class="muted"><small>UTF-8 only · 5 MB maximum · 5,000 data rows</small></p></aside>
+</div>
+
+<section class="table-card" style="margin-top:1.25rem">
+  <div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Source registry</h2><span class="status-pill info">{{ sources|length }} sources</span></div>
+  <div class="table-responsive"><table class="data-table"><thead><tr><th>Source</th><th>Purpose</th><th>Coverage</th><th>Freshness</th><th>State</th><th>Action</th></tr></thead><tbody>{% for source in sources %}<tr><td><strong>{{ source.name }}</strong><br><small>{{ source.provider }}</small></td><td>{{ source.get_kind_display }}</td><td>{{ source.geographic_coverage|default:'Not specified' }}</td><td>{{ source.last_updated_at|date:'M j, Y H:i'|default:'No refresh recorded' }}</td><td><span class="status-pill {% if source.is_demo %}warning{% elif source.is_active %}success{% else %}danger{% endif %}">{% if source.is_demo %}Sample{% elif source.is_active %}Active{% else %}Inactive{% endif %}</span></td><td><a class="btn btn-outline-brand" href="{% url 'administration:data_source_update' source.pk %}">Edit</a></td></tr>{% empty %}<tr><td colspan="6">No sources registered.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<section class="table-card" style="margin-top:1.25rem">
+  <div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Agricultural datasets</h2><span class="status-pill info">{{ datasets|length }} datasets</span></div>
+  <div class="table-responsive"><table class="data-table"><thead><tr><th>Dataset</th><th>Source</th><th>Status</th><th>Coverage</th><th>Period / units</th><th>Action</th></tr></thead><tbody>{% for dataset in datasets %}<tr><td><strong>{{ dataset.title }}</strong><br><small>{{ dataset.slug }}</small></td><td>{{ dataset.source.name }}</td><td><span class="status-pill {% if dataset.status == 'VERIFIED' %}success{% elif dataset.status == 'FAILED' %}danger{% else %}warning{% endif %}">{{ dataset.get_status_display }}</span></td><td>{{ dataset.geographic_coverage|default:'Not specified' }}</td><td>{{ dataset.date_start|default:'-' }} - {{ dataset.date_end|default:'-' }}<br><small>{{ dataset.units|default:'Units not specified' }}</small></td><td><a class="btn btn-outline-brand" href="{% url 'administration:dataset_update' dataset.pk %}">Edit</a></td></tr>{% empty %}<tr><td colspan="6">No datasets registered.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<section class="table-card" style="margin-top:1.25rem">
+  <div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Supported crop catalog</h2><span class="status-pill info">{{ crops|length }} entries</span></div>
+  <div class="table-responsive"><table class="data-table"><thead><tr><th>Crop</th><th>Variety</th><th>State</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{% for crop in crops %}<tr><td><strong>{{ crop.name }}</strong></td><td>{{ crop.variety|default:'All / unspecified' }}</td><td><span class="status-pill {% if crop.is_supported %}success{% else %}neutral{% endif %}">{% if crop.is_supported %}Supported{% else %}Disabled{% endif %}</span></td><td>{{ crop.updated_at|date:'M j, Y H:i' }}</td><td><div class="form-actions"><a class="btn btn-outline-brand" href="{% url 'administration:crop_update' crop.pk %}">Edit</a><form method="post" action="{% url 'administration:crop_toggle' crop.pk %}" onsubmit="return confirm('Change this crop catalog state?')">{% csrf_token %}<input type="hidden" name="action" value="{% if crop.is_supported %}disable{% else %}support{% endif %}"><button class="btn btn-outline-brand" type="submit">{% if crop.is_supported %}Disable{% else %}Support{% endif %}</button></form></div></td></tr>{% empty %}<tr><td colspan="5">No crop catalog entries.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<section class="table-card" style="margin-top:1.25rem"><div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Recent import jobs</h2></div><div class="table-responsive"><table class="data-table"><thead><tr><th>File</th><th>Dataset</th><th>Kind</th><th>Rows</th><th>Status</th><th>Created</th></tr></thead><tbody>{% for job in import_jobs %}<tr><td>{{ job.filename }}</td><td>{{ job.dataset.title }}</td><td>{{ job.get_kind_display }}</td><td>{{ job.rows_imported }} / {{ job.rows_received }}</td><td><span class="status-pill {% if job.status == 'COMPLETED' %}success{% elif job.status == 'FAILED' %}danger{% else %}warning{% endif %}">{{ job.get_status_display }}</span>{% if job.errors %}<br><small class="muted">{{ job.errors.0 }}</small>{% endif %}</td><td>{{ job.created_at|date:'M j, H:i' }}</td></tr>{% empty %}<tr><td colspan="6">No imports yet.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Farmers{% endblock %}
+{% block page_title %}Farmers{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Farmer accounts</span><h1>Farmer overview</h1><p>Account status and aggregate farm ownership without exposing private field details publicly.</p></div></div>
+<div class="table-card"><div class="table-responsive"><table class="data-table"><thead><tr><th>Farmer</th><th>District</th><th>Farms</th><th>Verification</th><th>Account</th></tr></thead><tbody>{% for farmer in farmers %}<tr><td><strong>{{ farmer.display_name }}</strong><br><small class="muted">{{ farmer.email }}</small></td><td>{{ farmer.district|default:'—' }}</td><td>{{ farmer.farm_total }}</td><td><span class="status-pill {% if farmer.is_verified %}success{% else %}warning{% endif %}">{% if farmer.is_verified %}Verified{% else %}Pending{% endif %}</span></td><td><span class="status-pill {% if farmer.is_active %}success{% else %}danger{% endif %}">{% if farmer.is_active %}Active{% else %}Suspended{% endif %}</span></td></tr>{% empty %}<tr><td colspan="5">No farmer accounts found.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

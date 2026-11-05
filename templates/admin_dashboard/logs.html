@@ -1,0 +1,8 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Activity Logs{% endblock %}
+{% block page_title %}Activity Logs{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Accountability</span><h1>Audit and security events</h1><p>Search important account, review, data, and export actions. Passwords, tokens, and API keys are never recorded.</p></div></div>
+<form method="get" class="form-card" style="max-width:none;margin-bottom:1rem"><div class="button-row"><input name="q" value="{{ request.GET.q }}" placeholder="Actor, action, or target" style="max-width:520px"><button class="btn btn-brand" type="submit">Search logs</button></div></form>
+<div class="table-card"><div class="table-responsive"><table class="data-table"><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Target</th><th>Result</th></tr></thead><tbody>{% for log in logs %}<tr><td>{{ log.created_at|date:'Y-m-d H:i:s' }}</td><td>{{ log.actor.email|default:'System' }}</td><td>{{ log.action }}</td><td>{{ log.target_type }}{% if log.target_identifier %} #{{ log.target_identifier }}{% endif %}</td><td><span class="status-pill {% if log.result == 'SUCCESS' %}success{% elif log.result == 'DENIED' %}warning{% else %}danger{% endif %}">{{ log.get_result_display }}</span></td></tr>{% empty %}<tr><td colspan="5">No matching audit events.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

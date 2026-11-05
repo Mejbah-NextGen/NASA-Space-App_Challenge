@@ -1,0 +1,18 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}{{ farm.name }}{% endblock %}
+{% block dashboard_content %}
+<div class="page-heading">
+  <div><span class="eyebrow">{{ farm.district }}{% if farm.upazila %} · {{ farm.upazila }}{% endif %}</span><h1>{{ farm.name }}</h1><p>{{ farm.land_area }} {{ farm.get_area_unit_display }} · {{ farm.get_soil_type_display }} · {{ farm.get_irrigation_type_display }}</p></div>
+  <div class="button-row"><a class="btn btn-secondary" href="{% url 'farms:farm_update' farm.pk %}">Edit farm</a><a class="btn btn-primary" href="{% url 'farms:field_create' farm.pk %}">+ Add field</a></div>
+</div>
+{% if farm.description %}<div class="notice-card">{{ farm.description }}</div>{% endif %}
+<section class="section-block"><div class="section-heading"><div><span class="eyebrow">Fields & crops</span><h2>Your fields</h2></div></div>
+<div class="card-grid card-grid-3">
+{% for field in farm.fields.all %}<article class="card"><div class="card-meta"><span class="status-pill">{{ field.get_status_display }}</span></div><h3>{{ field.name }}</h3><p>{{ field.area }} {{ field.get_area_unit_display }}</p><p class="muted">{{ field.get_soil_type_display }} · {{ field.get_irrigation_type_display }}</p><div class="stack-list">{% for planting in field.plantings.all|slice:":3" %}<a href="{% url 'farms:planting_update' planting.pk %}"><strong>{{ planting.crop }}</strong><small>{{ planting.get_status_display }} · {{ planting.planting_date }}</small></a>{% empty %}<p class="muted">No crops recorded.</p>{% endfor %}</div><div class="button-row"><a class="btn btn-small btn-secondary" href="{% url 'farms:field_update' field.pk %}">Edit</a><a class="btn btn-small btn-primary" href="{% url 'farms:planting_create' field.pk %}">Add crop</a></div></article>{% empty %}<div class="empty-state card"><h3>No fields yet</h3><p>Add a field to track crops and work.</p></div>{% endfor %}
+</div></section>
+<div class="two-column-layout">
+  <section class="card"><div class="section-heading"><div><span class="eyebrow">Journal</span><h2>Recent activity</h2></div><a href="{% url 'farms:activity_create' farm.pk %}">Record activity</a></div><div class="timeline">{% for activity in farm.activities.all|slice:":6" %}<div class="timeline-item"><span>{{ activity.activity_date }}</span><strong>{{ activity.get_activity_type_display }}</strong><p>{{ activity.details|truncatewords:18 }}</p></div>{% empty %}<p class="muted">No activities have been recorded.</p>{% endfor %}</div></section>
+  <section class="card"><div class="section-heading"><div><span class="eyebrow">Next work</span><h2>Farm tasks</h2></div><a href="{% url 'farms:task_create' farm.pk %}">Add task</a></div><div class="stack-list">{% for task in farm.tasks.all|slice:":6" %}<div><strong>{{ task.title }}</strong><small>{{ task.due_date }} · {{ task.get_priority_display }} · {{ task.get_status_display }}</small></div>{% empty %}<p class="muted">No upcoming tasks.</p>{% endfor %}</div></section>
+</div>
+{% if not farm.is_archived %}<form class="danger-zone" method="post" action="{% url 'farms:farm_archive' farm.pk %}" onsubmit="return confirm('Archive this farm? Its records will be preserved.');">{% csrf_token %}<div><strong>Archive this farm</strong><p>Hide it from active farm lists while preserving its history.</p></div><button class="btn btn-danger" type="submit">Archive farm</button></form>{% endif %}
+{% endblock %}

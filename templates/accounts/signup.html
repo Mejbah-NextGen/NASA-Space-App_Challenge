@@ -1,0 +1,32 @@
+{% extends 'public/base_public.html' %}
+{% block title %}Create account · Farm Time Machine{% endblock %}
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-visual-copy">
+      <span class="section-kicker">Start with evidence</span>
+      <h1>Start with your field. Grow with better context.</h1>
+      <p>Farmers can begin immediately. Agriculturalists submit their professional details for platform-admin verification before providing expert services.</p>
+      <div class="two-grid" style="margin-top:2rem">
+        <div class="app-card" style="background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)"><h2 style="color:#fff;font-size:1.05rem">Farmer</h2><p style="color:#c5d8ce">Save farms, simulations, decisions, and expert conversations.</p></div>
+        <div class="app-card" style="background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)"><h2 style="color:#fff;font-size:1.05rem">Agriculturalist</h2><p style="color:#c5d8ce">Support assigned farmers after credential review and approval.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="auth-panel" style="padding-block:3rem">
+    <div class="auth-card">
+      <span class="eyebrow">Create your account</span>
+      <h1>Choose how you’ll use the platform</h1>
+      <p>Admins are provisioned securely and cannot register here.</p>
+      <form method="post" novalidate>
+        {% csrf_token %}{{ form.non_field_errors }}
+        {% for field in form %}
+          <p {% if field.name == 'account_type' %}class="radio-group"{% endif %}>{{ field.label_tag }}{{ field }}{{ field.errors }}{% if field.help_text %}<span class="helptext">{{ field.help_text|safe }}</span>{% endif %}</p>
+        {% endfor %}
+        <button class="btn btn-brand w-100" type="submit">Create account</button>
+      </form>
+      <p style="margin-top:1.25rem;text-align:center">Already registered? <a href="{% url 'accounts:login' %}"><strong>Sign in</strong></a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

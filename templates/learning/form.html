@@ -1,0 +1,6 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}{% if object %}Edit learning article{% else %}New learning article{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Expert workspace</span><h1>{% if object %}Edit learning article{% else %}Create learning article{% endif %}</h1><p>Save a clear, evidence-aware draft, then submit it for admin review.</p></div></div>
+<form method="post" class="card form-card">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}<div class="button-row"><button class="button button-primary" type="submit">Save draft</button><a class="button button-secondary" href="{% url 'learning:list' %}">Cancel</a></div></form>
+{% endblock %}

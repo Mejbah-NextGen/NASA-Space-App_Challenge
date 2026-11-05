@@ -1,0 +1,81 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}AI Farm Assistant{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Decision support</span><h1>AI Farm Assistant</h1><p>Ask about weather, history, crops, irrigation, or soil. Advice includes uncertainty and never replaces a qualified Agriculturalist.</p></div>
+  <form method="post" action="{% url 'ai_assistant:new_conversation' %}">{% csrf_token %}<button class="button button-secondary" type="submit">New chat</button></form>
+</div>
+
+{% if not provider_configured %}
+<div class="alert alert-info" role="status"><strong>Built-in guidance mode:</strong> an external AI provider is not configured. Responses use curated agricultural guidance and are labeled clearly.</div>
+{% endif %}
+
+<div class="assistant-workspace">
+  <aside class="card assistant-history" aria-label="Conversation history">
+    <h2>Conversations</h2>
+    {% for item in conversations %}<a class="history-link{% if conversation.pk == item.pk %} is-active{% endif %}" href="?conversation={{ item.pk }}">{{ item.title }}<small>{{ item.updated_at|date:"M j, H:i" }}</small></a>{% empty %}<p class="muted">Start with a suggested question.</p>{% endfor %}
+  </aside>
+  <section class="card assistant-chat" aria-label="Farm Assistant chat">
+    <div id="assistantMessages" class="assistant-messages" aria-live="polite">
+      {% if conversation %}
+        {% for message in conversation.messages.all %}
+          <article class="chat-bubble {% if message.role == 'USER' %}chat-user{% else %}chat-assistant{% endif %}">
+            <strong>{{ message.get_role_display }}</strong><p>{{ message.content|linebreaksbr }}</p>
+            {% if message.source_label %}<small>{{ message.source_label }}</small>{% endif %}
+          </article>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state"><h2>How can I help your farm?</h2><p>Your chat will be saved to your account.</p></div>
+      {% endif %}
+    </div>
+    <div class="suggested-questions" aria-label="Suggested questions">
+      {% for question in suggested_questions %}<button class="suggestion-chip" type="button" data-suggestion="{{ question }}">{{ question }}</button>{% endfor %}
+    </div>
+    <form id="assistantForm" class="assistant-form">
+      {% csrf_token %}
+      <label class="sr-only" for="assistantInput">Ask a farming question</label>
+      <textarea id="assistantInput" maxlength="1500" rows="2" placeholder="Ask a question about your farm..." required></textarea>
+      <button class="button button-primary" type="submit">Send</button>
+    </form>
+    <p id="assistantStatus" class="form-hint" role="status"></p>
+    {% if request.user.role == 'FARMER' %}<a class="text-link" href="{% url 'farmer_consultations:expert_list' %}">Ask a verified Agriculturalist instead</a>{% endif %}
+  </section>
+</div>
+<script>
+(() => {
+  const form = document.getElementById('assistantForm');
+  const input = document.getElementById('assistantInput');
+  const messages = document.getElementById('assistantMessages');
+  const status = document.getElementById('assistantStatus');
+  let conversationId = {% if conversation %}{{ conversation.pk }}{% else %}null{% endif %};
+  document.querySelectorAll('[data-suggestion]').forEach(button => button.addEventListener('click', () => { input.value = button.dataset.suggestion; input.focus(); }));
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const question = input.value.trim();
+    if (!question) return;
+    const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    status.textContent = 'Farm Assistant is preparing a response...';
+    form.querySelector('button').disabled = true;
+    try {
+      const response = await fetch('{% url "ai_assistant:chat" %}', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf}, body: JSON.stringify({message: question, conversation_id: conversationId})});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'The assistant is unavailable.');
+      conversationId = data.conversation_id;
+      messages.querySelector('.empty-state')?.remove();
+      const userBubble = document.createElement('article'); userBubble.className = 'chat-bubble chat-user';
+      const userStrong = document.createElement('strong'); userStrong.textContent = 'You';
+      const userText = document.createElement('p'); userText.textContent = question;
+      userBubble.append(userStrong, userText); messages.append(userBubble);
+      const replyBubble = document.createElement('article'); replyBubble.className = 'chat-bubble chat-assistant';
+      const replyStrong = document.createElement('strong'); replyStrong.textContent = 'Farm Assistant';
+      const replyText = document.createElement('p'); replyText.textContent = data.reply;
+      const source = document.createElement('small'); source.textContent = data.source;
+      replyBubble.append(replyStrong, replyText, source); messages.append(replyBubble);
+      input.value = ''; status.textContent = data.fallback ? 'Built-in guidance shown.' : 'Response received.';
+      messages.scrollTop = messages.scrollHeight;
+    } catch (error) { status.textContent = error.message; }
+    finally { form.querySelector('button').disabled = false; }
+  });
+})();
+</script>
+{% endblock %}

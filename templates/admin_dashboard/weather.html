@@ -1,0 +1,51 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Weather & Alerts{% endblock %}
+{% block page_title %}Weather & Alerts{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Operational weather</span><h1>Weather and alert records</h1><p>Create time-bounded alerts and manage their publication state. Every action is recorded.</p></div>
+</div>
+
+<section class="form-card">
+  <h2>Create a weather alert</h2>
+  <p class="muted">Choose an active weather source, affected region, severity, effective window, and a practical recommendation.</p>
+  <form method="post" action="{% url 'administration:weather_alert_create' %}">
+    {% csrf_token %}
+    {{ alert_form.non_field_errors }}
+    <div class="form-grid">
+      {% for field in alert_form %}
+        <div{% if field.name == 'description' or field.name == 'recommendation' %} style="grid-column:1/-1"{% endif %}>
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+          {% for error in field.errors %}<div class="app-alert app-alert-error">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="form-actions"><button class="btn btn-brand" type="submit">Create alert</button></div>
+  </form>
+</section>
+
+<section class="table-card" style="margin-top:1.25rem">
+  <div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Active and recent alerts</h2></div>
+  <div class="table-responsive"><table class="data-table">
+    <thead><tr><th>Alert</th><th>Region</th><th>Severity</th><th>Window</th><th>Source</th><th>State</th><th>Action</th></tr></thead>
+    <tbody>{% for alert in alerts %}<tr>
+      <td><strong>{{ alert.title }}</strong><br><small>{{ alert.description|truncatewords:12 }}</small></td>
+      <td>{{ alert.region }}</td><td>{{ alert.get_severity_display }}</td>
+      <td>{{ alert.starts_at|date:'M j H:i' }} - {{ alert.ends_at|date:'M j H:i' }}</td>
+      <td>{{ alert.source.name }}</td>
+      <td><span class="status-pill {% if alert.is_active %}warning{% else %}neutral{% endif %}">{% if alert.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+      <td><form method="post" action="{% url 'administration:weather_alert_toggle' alert.pk %}" onsubmit="return confirm('Change this weather alert state?')">{% csrf_token %}<input type="hidden" name="action" value="{% if alert.is_active %}deactivate{% else %}activate{% endif %}"><button class="btn btn-outline-brand" type="submit">{% if alert.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td>
+    </tr>{% empty %}<tr><td colspan="7">No weather alerts.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="table-card" style="margin-top:1.25rem">
+  <div class="table-toolbar"><h2 style="font-size:1.15rem;margin:0">Latest stored observations</h2></div>
+  <div class="table-responsive"><table class="data-table">
+    <thead><tr><th>Region</th><th>Observed</th><th>Temperature</th><th>Rainfall</th><th>Humidity</th><th>Source</th></tr></thead>
+    <tbody>{% for observation in observations %}<tr><td>{{ observation.region }}</td><td>{{ observation.observed_at|date:'M j, Y H:i' }}</td><td>{{ observation.temperature_c|default:'-' }}°C</td><td>{{ observation.rainfall_mm|default:'-' }} mm</td><td>{{ observation.humidity_percent|default:'-' }}%</td><td>{{ observation.source.name }}</td></tr>{% empty %}<tr><td colspan="6">No stored observations.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

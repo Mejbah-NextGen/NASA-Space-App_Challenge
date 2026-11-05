@@ -1,0 +1,6 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}{% if object %}Edit farm{% else %}Add farm{% endif %}{% endblock %}
+{% block dashboard_content %}
+<div class="page-heading"><div><span class="eyebrow">Farm details</span><h1>{% if object %}Edit {{ object.name }}{% else %}Add a farm{% endif %}</h1><p>Use local land units and a precise location for more useful analysis.</p></div></div>
+<form class="card form-card" method="post" novalidate>{% csrf_token %}{{ form.as_p }}<div class="form-actions"><button class="btn btn-primary" type="submit">Save farm</button><a class="btn btn-secondary" href="{% url 'farms:farm_list' %}">Cancel</a></div></form>
+{% endblock %}

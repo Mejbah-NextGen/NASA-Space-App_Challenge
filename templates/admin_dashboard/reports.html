@@ -1,0 +1,7 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Reports & Analytics{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Platform reporting</span><h1>Reports and analytics</h1><p>Aggregate account, farm, and consultation statistics with a formula-injection-safe CSV export.</p></div><a class="btn btn-brand" href="{% url 'administration:report_export' %}"><i data-lucide="download"></i> Export users CSV</a></div>
+<div class="three-grid"><section class="app-card"><h2 style="font-size:1.1rem">Users by role</h2>{% for row in role_distribution %}<div class="object-row"><strong>{{ row.role|title }}</strong><span>{{ row.total }}</span></div>{% empty %}<p>No data</p>{% endfor %}</section><section class="app-card"><h2 style="font-size:1.1rem">Farms by district</h2>{% for row in farm_regions %}<div class="object-row"><strong>{{ row.district|default:'Unspecified' }}</strong><span>{{ row.total }}</span></div>{% empty %}<p>No data</p>{% endfor %}</section><section class="app-card"><h2 style="font-size:1.1rem">Consultation states</h2>{% for row in consultation_statuses %}<div class="object-row"><strong>{{ row.status|title }}</strong><span>{{ row.total }}</span></div>{% empty %}<p>No data</p>{% endfor %}</section></div>
+{% endblock %}

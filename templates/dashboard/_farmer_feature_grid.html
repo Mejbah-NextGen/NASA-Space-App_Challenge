@@ -1,0 +1,15 @@
+<section class="feature-navigation" id="feature-navigation" aria-labelledby="feature-navigation-title">
+  <h2 id="feature-navigation-title">Explore your farm</h2>
+  <div class="feature-grid">
+    <a class="feature-nav-card" href="{% url 'dashboard:farmer_dashboard' %}"><span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span><strong>Dashboard</strong><small>Today at a glance</small></span></a>
+    <a class="feature-nav-card" href="{% url 'farms:farm_list' %}"><span class="nav-icon"><i data-lucide="sprout"></i></span><span><strong>My Farm</strong><small>Fields and crops</small></span></a>
+    <a class="feature-nav-card" href="{% url 'agricultural_data:farmer_history' %}"><span class="nav-icon"><i data-lucide="history"></i></span><span><strong>Farm History</strong><small>Previous years</small></span></a>
+    <a class="feature-nav-card" href="{% url 'simulations:simulator' %}"><span class="nav-icon"><i data-lucide="flask-conical"></i></span><span><strong>Farm Simulator</strong><small>Explore scenarios</small></span></a>
+    <a class="feature-nav-card" href="{% url 'decisions:list' %}"><span class="nav-icon"><i data-lucide="notebook-tabs"></i></span><span><strong>Past Decisions</strong><small>Activity journal</small></span></a>
+    <a class="feature-nav-card" href="{% url 'farmer_consultations:list' %}"><span class="nav-icon"><i data-lucide="messages-square"></i></span><span><strong>Ask an Expert</strong><small>Talk to a specialist</small></span></a>
+    <a class="feature-nav-card" href="{% url 'weather:farmer_weather' %}"><span class="nav-icon"><i data-lucide="cloud-sun"></i></span><span><strong>Weather &amp; Alerts</strong><small>Local forecasts</small></span></a>
+    <a class="feature-nav-card" href="{% url 'dashboard:farmer_learning' %}"><span class="nav-icon"><i data-lucide="book-open"></i></span><span><strong>Learning Center</strong><small>Guides and tips</small></span></a>
+    <a class="feature-nav-card" href="{% url 'dashboard:farmer_support' %}"><span class="nav-icon"><i data-lucide="circle-help"></i></span><span><strong>Help &amp; Support</strong><small>Get assistance</small></span></a>
+    <a class="feature-nav-card" href="{% url 'dashboard:farmer_data_sources' %}"><span class="nav-icon"><i data-lucide="database"></i></span><span><strong>Data Sources</strong><small>Origins and updates</small></span></a>
+  </div>
+</section>

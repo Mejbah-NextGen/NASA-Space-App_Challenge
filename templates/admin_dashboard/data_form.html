@@ -1,0 +1,9 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}{{ entity_label }}{% endblock %}
+{% block page_title %}Agricultural Data{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Validated metadata</span><h1>{% if object %}Edit{% else %}Create{% endif %} {{ entity_label|lower }}</h1><p>Changes are restricted to platform administrators and recorded in the activity log.</p></div><a class="btn btn-outline-brand" href="{% url 'administration:data' %}">Back to data management</a></div>
+<div class="form-card" style="max-width:850px">
+  <form method="post" novalidate>{% csrf_token %}{{ form.non_field_errors }}{{ form.as_p }}<div class="form-actions"><button class="btn btn-brand" type="submit">Save {{ entity_label|lower }}</button><a class="btn btn-outline-brand" href="{% url 'administration:data' %}">Cancel</a></div></form>
+</div>
+{% endblock %}

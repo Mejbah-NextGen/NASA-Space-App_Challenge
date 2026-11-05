@@ -1,0 +1,7 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Expert Recommendations{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Evidence-aware advice</span><h1>Expert Recommendations</h1><p>Review your draft and published recommendations across assigned cases.</p></div><a class="button button-primary" href="{% url 'agriculturalist:questions' %}">Open farmer questions</a></div>
+<div class="stack-list">{% for recommendation in recommendations %}<article class="card list-card"><div><div class="card-meta"><span class="status-pill">{{ recommendation.get_status_display }}</span><span>{{ recommendation.get_priority_display }}</span></div><h2>{{ recommendation.title }}</h2><p>{{ recommendation.explanation|truncatewords:30 }}</p><small>{{ recommendation.consultation.farmer.display_name }} · Updated {{ recommendation.updated_at|timesince }} ago</small></div><a class="button button-secondary" href="{% url 'agriculturalist:question_detail' recommendation.consultation_id %}">Open case</a></article>{% empty %}<div class="empty-state"><h2>No recommendations yet</h2><p>Open an assigned case to draft evidence-aware advice.</p></div>{% endfor %}</div>
+{% include "consultations/_pagination.html" %}
+{% endblock %}

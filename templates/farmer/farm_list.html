@@ -1,0 +1,27 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}My Farm{% endblock %}
+{% block dashboard_content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Personal farm records</span><h1>My Farm</h1><p>Manage your farms, fields, crops, activities, and upcoming work.</p></div>
+  <a class="btn btn-primary" href="{% url 'farms:farm_create' %}">+ Add farm</a>
+</div>
+<form class="filter-bar" method="get" role="search">
+  <label class="visually-hidden" for="farm-search">Search farms</label>
+  <input id="farm-search" name="q" value="{{ request.GET.q }}" placeholder="Search farm or district">
+  <button class="btn btn-secondary" type="submit">Search</button>
+  <a href="?archived=1">View archived</a>
+</form>
+<div class="card-grid card-grid-3">
+  {% for farm in farms %}
+    <article class="card farm-card">
+      <div class="card-meta"><span class="status-pill">{{ farm.district }}</span>{% if farm.is_archived %}<span class="status-pill status-muted">Archived</span>{% endif %}</div>
+      <h2>{{ farm.name }}</h2>
+      <p>{{ farm.land_area }} {{ farm.get_area_unit_display }} · {{ farm.get_soil_type_display }}</p>
+      <p class="muted">{{ farm.upazila|default:"Upazila not set" }}{% if farm.village %}, {{ farm.village }}{% endif %}</p>
+      <a class="card-link" href="{% url 'farms:farm_detail' farm.pk %}">Open farm <span aria-hidden="true">→</span></a>
+    </article>
+  {% empty %}
+    <div class="empty-state card"><h2>No farms yet</h2><p>Add your first farm to start tracking fields and decisions.</p><a class="btn btn-primary" href="{% url 'farms:farm_create' %}">Add your farm</a></div>
+  {% endfor %}
+</div>
+{% endblock %}

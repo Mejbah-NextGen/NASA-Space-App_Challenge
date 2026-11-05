@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments and local secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Django local/runtime artifacts
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/*.local.json
+.DS_Store
+Thumbs.db
+
+# Temporary design/PDF/browser artifacts
+tmp/
+output/

@@ -1,0 +1,6 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}New consultation{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Private expert request</span><h1>Ask an Agriculturalist</h1><p>Describe the issue clearly. Sharing a farm is optional and can be revoked at any time.</p></div></div>
+<form method="post" enctype="multipart/form-data" class="card form-card">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="form-group{% if field.field.widget.input_type == 'checkbox' %} checkbox-group{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}<div class="alert alert-info"><strong>Consent note:</strong> an expert only receives the selected farm data when you explicitly enable sharing. You can revoke it from the case page.</div><div class="button-row"><button class="button button-primary" type="submit">Submit request</button><a class="button button-secondary" href="{% url 'farmer_consultations:list' %}">Cancel</a></div></form>
+{% endblock %}

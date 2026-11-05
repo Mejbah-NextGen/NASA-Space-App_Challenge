@@ -1,0 +1,7 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Account Settings{% endblock %}
+{% block page_title %}Account Settings{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Preferences</span><h1>Account settings</h1><p>Choose your language and which platform updates you want to receive.</p></div><a class="btn btn-outline-brand" href="{% url 'accounts:password_change' %}"><i data-lucide="shield-check"></i> Change password</a></div>
+<form method="post" class="form-card" novalidate>{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<p>{{ field.label_tag }}{{ field }}{{ field.errors }}</p>{% endfor %}<div class="form-actions"><button class="btn btn-brand" type="submit">Save preferences</button></div></form>
+{% endblock %}

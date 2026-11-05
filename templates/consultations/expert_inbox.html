@@ -1,0 +1,8 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Farmer Questions{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Assigned cases</span><h1>Farmer Questions</h1><p>Respond only to assigned requests and use consented farm context responsibly.</p></div></div>
+<form class="filter-bar card" method="get"><div><label for="questionSearch">Search</label><input id="questionSearch" name="q" value="{{ request.GET.q }}" placeholder="Farmer or question"></div><div><label for="questionStatus">Status</label><select id="questionStatus" name="status"><option value="">All statuses</option><option value="ASSIGNED">Assigned</option><option value="ACTIVE">Active</option><option value="COMPLETED">Completed</option></select></div><button class="button button-primary" type="submit">Filter</button></form>
+<div class="stack-list">{% for item in consultations %}<a class="card list-card" href="{% url 'agriculturalist:question_detail' item.pk %}"><div><span class="status-pill">{{ item.get_status_display }}</span><h2>{{ item.title }}</h2><p>{{ item.farmer.display_name }}{% if item.farm %} · {{ item.farm.name }}{% endif %}</p><small>Updated {{ item.updated_at|timesince }} ago</small></div><span aria-hidden="true">→</span></a>{% empty %}<div class="empty-state"><h2>No assigned questions</h2><p>New cases will appear after a farmer selects you or an admin assigns one.</p></div>{% endfor %}</div>
+{% include "consultations/_pagination.html" %}
+{% endblock %}

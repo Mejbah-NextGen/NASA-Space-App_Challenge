@@ -1,0 +1,7 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Agriculturalist workspace</span><h1>{{ page_title }}</h1><p>{{ page_description }}</p></div></div>
+<div class="metric-grid"><article class="metric-card"><span>Active assigned cases</span><strong>{{ active_cases }}</strong><small>Consent and assignment checks enforced</small></article><article class="metric-card"><span>Data policy</span><strong>Private</strong><small>Only explicitly shared case data</small></article></div>
+<div class="card"><h2>Start from an assigned case</h2><p>This workspace connects analysis to an authorized farmer question. Open Farmer Questions to select a case, review consent, and continue.</p><a class="button button-primary" href="{% url 'agriculturalist:questions' %}">View farmer questions</a></div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Support Ticket #{{ ticket.pk }}{% endblock %}
+{% block page_title %}Support Ticket{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Ticket #{{ ticket.pk }}</span><h1>{{ ticket.subject }}</h1><p>Submitted {{ ticket.created_at|date:'M j, Y H:i' }} by {{ ticket.name }}.</p></div><a class="btn btn-outline-brand" href="{% url 'administration:support' %}">Back to tickets</a></div>
+<div class="split-grid">
+  <section class="app-card">
+    <h2>Request</h2>
+    <dl><dt>Requester</dt><dd>{{ ticket.name }}{% if ticket.user %} (account #{{ ticket.user.pk }}){% endif %}</dd><dt>Email</dt><dd>{{ ticket.email }}</dd><dt>Current status</dt><dd>{{ ticket.get_status_display }}</dd><dt>Current priority</dt><dd>{{ ticket.get_priority_display }}</dd></dl>
+    <h3 style="font-size:1rem">Message</h3><p>{{ ticket.message|linebreaksbr }}</p>
+    {% if ticket.staff_response %}<h3 style="font-size:1rem">Current staff response</h3><p>{{ ticket.staff_response|linebreaksbr }}</p>{% endif %}
+  </section>
+  <form method="post" class="form-card">
+    {% csrf_token %}<h2>Update ticket</h2>{{ form.as_p }}
+    <div class="form-actions"><button class="btn btn-brand" type="submit">Save update</button></div>
+    <p class="muted"><small>Account holders receive a notification when this record changes. Response text is not written to the audit log.</small></p>
+  </form>
+</div>
+{% endblock %}

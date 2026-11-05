@@ -1,0 +1,76 @@
+{% extends "public/base_public.html" %}
+{% block title %}Historical Data Explorer - Farm Time Machine{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Agricultural time machine</span>
+    <h1>Explore a decade of growing conditions</h1>
+    <p>Compare rainfall, temperature, and crop observations with source and quality context.</p>
+  </div>
+</section>
+<section class="pb-5"><div class="container">
+  <form class="filter-card row g-3 align-items-end" method="get">
+    <div class="col-md-3"><label class="form-label" for="district">District</label><select class="form-select" id="district" name="district"><option>{{ selected_district }}</option>{% for district in districts %}{% if district != selected_district %}<option>{{ district }}</option>{% endif %}{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="crop">Crop</label><select class="form-select" id="crop" name="crop"><option value="">All crops</option>{% for crop in crops %}<option{% if crop == selected_crop %} selected{% endif %}>{{ crop }}</option>{% endfor %}</select></div>
+    <div class="col-6 col-md-2"><label class="form-label" for="start_year">From</label><input class="form-control" id="start_year" name="start_year" type="number" min="1900" max="2200" value="{{ start_year }}"></div>
+    <div class="col-6 col-md-2"><label class="form-label" for="end_year">To</label><input class="form-control" id="end_year" name="end_year" type="number" min="1900" max="2200" value="{{ end_year }}"></div>
+    <div class="col-md-2"><button class="btn btn-success w-100" type="submit">Update charts</button></div>
+  </form>
+
+  <div class="data-trust-strip mt-3">
+    <span><strong>Weather series</strong></span>
+    <span class="data-badge {% if weather_is_demo %}sample{% else %}verified{% endif %}">{% if weather_is_demo %}Sample data{% else %}{{ weather_source_meta.status }}{% endif %}</span>
+    <span><strong>Source:</strong> {{ weather_source_meta.name }}</span>
+    <span><strong>Location:</strong> {{ selected_district }}</span>
+    <span><strong>Period:</strong> {{ start_year }}-{{ end_year }}</span>
+    <span><strong>Units:</strong> mm and °C</span>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-lg-7"><article class="card h-100"><div class="card-body"><h2 class="h4">Rainfall by year</h2><p class="text-secondary">Annual totals in millimetres.</p><div class="chart-wrap chart-lg"><canvas id="rainChart"></canvas></div></div></article></div>
+    <div class="col-lg-5"><article class="card h-100"><div class="card-body"><h2 class="h4">Mean temperature trend</h2><p class="text-secondary">Annual mean in degrees Celsius.</p><div class="chart-wrap chart-lg"><canvas id="tempChart"></canvas></div></div></article></div>
+  </div>
+
+  <article class="card mt-4"><div class="card-body">
+    <h2 class="h4">Crop production observations</h2>
+    <div class="data-trust-strip mb-3">
+      <span class="data-badge {% if crop_is_demo %}sample{% else %}verified{% endif %}">{% if crop_is_demo %}Sample / unavailable{% else %}{{ crop_source_meta.status }}{% endif %}</span>
+      <span><strong>Crop source:</strong> {{ crop_source_meta.name }}</span>
+    </div>
+    {% if crop_series %}<div class="chart-wrap chart-lg"><canvas id="cropChart"></canvas></div>{% else %}<div class="empty-state"><h3>No crop observations match these filters</h3><p>Historical weather remains available above. Try a different district or crop.</p></div>{% endif %}
+  </div></article>
+
+  {% if weather_is_demo or crop_is_demo %}<div class="alert alert-warning mt-4" role="status"><strong>Demonstration or unavailable series:</strong> each chart is labeled independently. Sample values illustrate the explorer and must not be treated as verified observations or a forecast.</div>{% endif %}
+</div></section>
+{{ chart_data|json_script:"history-chart-data" }}
+{{ crop_years|json_script:"crop-years-data" }}
+{{ crop_series|json_script:"crop-series-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  if (!window.Chart) return;
+  const d = JSON.parse(document.getElementById('history-chart-data').textContent);
+  const common = {responsive: true, maintainAspectRatio: false, scales: {x: {grid: {display: false}}}};
+  new Chart(document.getElementById('rainChart'), {type: 'bar', data: {labels: d.years, datasets: [{label: 'Rainfall (mm)', data: d.rainfall, backgroundColor: '#20734D', borderRadius: 5}]}, options: common});
+  new Chart(document.getElementById('tempChart'), {type: 'line', data: {labels: d.years, datasets: [{label: 'Mean temperature (°C)', data: d.temperature, borderColor: '#CB8B34', backgroundColor: 'rgba(203,139,52,.16)', fill: true, tension: .3}]}, options: common});
+  const cropYears = JSON.parse(document.getElementById('crop-years-data').textContent);
+  const crops = JSON.parse(document.getElementById('crop-series-data').textContent);
+  const cropCanvas = document.getElementById('cropChart');
+  if (cropCanvas) {
+    const colors = ['#20734D', '#3A83AD', '#CB8B34', '#BF514E'];
+    const datasets = Object.entries(crops).map(([name, rows], index) => ({
+      label: name,
+      data: cropYears.map(year => {
+        const row = rows.find(item => item.year === year);
+        return row ? row.production : null;
+      }),
+      borderColor: colors[index % colors.length],
+      tension: .25,
+    }));
+    new Chart(cropCanvas, {type: 'line', data: {labels: cropYears, datasets}, options: common});
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "public/base_public.html" %}
+{% block title %}Help & Support - Farm Time Machine{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container"><span class="eyebrow">Help &amp; Support</span><h1>How can we help?</h1><p>Read common answers or submit a support ticket. Logged-in users can review ticket status below.</p></div></section>
+<section class="pb-5"><div class="container"><div class="row g-4">
+  <div class="col-lg-6">
+    <div class="accordion" id="faq">
+      <details class="faq-item" open><summary>Are sample values real observations?</summary><p>No. Anything marked Sample or Demonstration exists only to show how the interface works.</p></details>
+      <details class="faq-item"><summary>Does a simulation predict my harvest?</summary><p>No. The baseline simulator is deterministic decision support, not a calibrated yield forecast or guarantee.</p></details>
+      <details class="faq-item"><summary>Who can see my farm?</summary><p>You control farm-data consent. Agriculturalists can only access information shared for an authorized consultation or assignment.</p></details>
+      <details class="faq-item"><summary>Why is live weather unavailable?</summary><p>The provider may be unreachable or live integration may be disabled. The status and last update appear beside the weather card.</p></details>
+    </div>
+    {% if tickets %}<article class="card mt-4"><div class="card-body"><h2 class="h4">Your recent requests</h2><div class="list-group list-group-flush">{% for ticket in tickets %}<div class="list-group-item px-0 d-flex justify-content-between gap-3"><span><strong>#{{ ticket.pk }} {{ ticket.subject }}</strong><small class="d-block">Updated {{ ticket.updated_at|timesince }} ago</small></span><span class="data-badge">{{ ticket.get_status_display }}</span></div>{% endfor %}</div></div></article>{% endif %}
+  </div>
+  <div class="col-lg-6"><article class="card"><div class="card-body p-lg-4"><h2 class="h3">Submit a support ticket</h2><form method="post" novalidate>{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}<button class="btn btn-success" type="submit">Submit request</button></form></div></article></div>
+</div></div></section>
+{% endblock %}

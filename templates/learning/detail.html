@@ -1,0 +1,9 @@
+{% extends "public/base_public.html" %}
+{% block title %}{{ article.title }}{% endblock %}
+{% block content %}
+<article class="section"><div class="container article-layout">
+  <header class="article-header"><a class="back-link" href="{% url 'learning:list' %}">← Learning Center</a><div class="card-meta"><span class="status-pill">{{ article.category.name }}</span><span>{{ article.get_language_display }}</span></div><h1>{{ article.title }}</h1><p class="lead">{{ article.summary }}</p><p class="muted">Reviewed learning content · {{ article.published_at|date:"F j, Y"|default:"Not published" }} · By {{ article.author.display_name }}</p></header>
+  <div class="card article-body">{{ article.body|linebreaks }}</div>
+  <aside class="card trust-card"><h2>Use guidance responsibly</h2><p>Local soil, weather, crop variety, and farm conditions can change the right action. Consult a qualified Agriculturalist before a high-cost or safety-critical decision.</p></aside>
+</div></article>
+{% endblock %}

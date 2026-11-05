@@ -1,0 +1,7 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Assigned Farmers{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Authorized relationships</span><h1>Assigned Farmers</h1><p>Farm details are visible only when an active consultation contains explicit farmer consent.</p></div></div>
+<div class="card-grid three-column">{% for assignment in assignments %}<article class="card"><span class="status-pill status-success">Active case</span><h2>{{ assignment.farmer.display_name }}</h2><p>{{ assignment.consultation.title }}</p><p class="muted">{{ assignment.message_count }} messages · Assigned {{ assignment.assigned_at|date:"M j, Y" }}</p><a class="button button-secondary" href="{% url 'agriculturalist:question_detail' assignment.consultation_id %}">Open case</a></article>{% empty %}<div class="empty-state"><h2>No active assignments</h2><p>Only assigned farmers appear in this private workspace.</p></div>{% endfor %}</div>
+{% include "consultations/_pagination.html" %}
+{% endblock %}

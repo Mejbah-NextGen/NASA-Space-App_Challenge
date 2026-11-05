@@ -1,0 +1,7 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Help & Support{% endblock %}
+{% block page_title %}Help & Support{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Support operations</span><h1>Support tickets</h1><p>Review user-submitted support requests and their current status.</p></div></div>
+<div class="table-card"><div class="table-responsive"><table class="data-table"><thead><tr><th>Ticket</th><th>Requester</th><th>Priority</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead><tbody>{% for ticket in tickets %}<tr><td><strong>#{{ ticket.pk }} {{ ticket.subject }}</strong><br><small>{{ ticket.message|truncatewords:14 }}</small></td><td>{{ ticket.name }}<br><small>{{ ticket.email }}</small></td><td>{{ ticket.get_priority_display }}</td><td><span class="status-pill {% if ticket.status == 'RESOLVED' or ticket.status == 'CLOSED' %}success{% else %}warning{% endif %}">{{ ticket.get_status_display }}</span></td><td>{{ ticket.updated_at|date:'M j, Y H:i' }}</td><td><a class="btn btn-outline-brand" href="{% url 'administration:support_ticket' ticket.pk %}">Review</a></td></tr>{% empty %}<tr><td colspan="6">No support tickets.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Farmer Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+{% include 'dashboard/_farmer_feature_grid.html' %}
+<div class="page-head">
+  <div><span class="eyebrow">Farmer workspace</span><h1>Good {% now "H" as current_hour %}{% if current_hour < '12' %}morning{% elif current_hour < '18' %}afternoon{% else %}evening{% endif %}, {{ user.display_name|truncatewords:1 }}</h1><p>{{ user.district|default:'Add your district' }} · Your evidence-aware farm overview</p></div>
+  <a class="btn btn-brand" href="{% url 'farms:farm_create' %}"><i data-lucide="plus"></i> Add farm</a>
+</div>
+
+<div class="metric-grid">
+  <div class="metric-card success"><span class="metric-label">Registered farms</span><strong class="metric-value">{{ farm_count }}</strong><small>Active farm records</small></div>
+  <div class="metric-card info"><span class="metric-label">Active crops</span><strong class="metric-value">{{ active_crop_count }}</strong><small>Planned or growing</small></div>
+  <div class="metric-card warning"><span class="metric-label">Open consultations</span><strong class="metric-value">{{ active_consultation_count }}</strong><small>Pending expert activity</small></div>
+  <div class="metric-card"><span class="metric-label">Weather alerts</span><strong class="metric-value">{{ weather_alerts|length }}</strong><small>Relevant active notices</small></div>
+</div>
+
+<div class="split-grid" style="margin-top:1.25rem">
+  <section class="app-card">
+    <div class="table-toolbar" style="padding:0 0 1rem"><div><span class="eyebrow">My farm</span><h2 style="font-size:1.25rem;margin:0">Fields and growing context</h2></div><a href="{% url 'farms:farm_list' %}">View all</a></div>
+    {% for farm in farms %}
+      <a class="object-row" href="{% url 'farms:farm_detail' farm.pk %}"><div><h3>{{ farm.name }}</h3><p>{{ farm.district }}{% if farm.upazila %} · {{ farm.upazila }}{% endif %} · {{ farm.land_area }} {{ farm.get_area_unit_display }}</p></div><span class="status-pill success">Active</span></a>
+    {% empty %}
+      <div class="empty-state"><div class="empty-icon"><i data-lucide="sprout"></i></div><h3>Add your first farm</h3><p>Farm-level history, simulations, and decisions begin with a private farm record.</p><a class="btn btn-brand" href="{% url 'farms:farm_create' %}">Create farm</a></div>
+    {% endfor %}
+  </section>
+  <aside class="app-card">
+    <span class="eyebrow">What should I do next?</span><h2 style="font-size:1.25rem">Build context before acting</h2>
+    {% if weather_alerts %}{% with alert=weather_alerts.0 %}<span class="status-pill warning">{{ alert.get_severity_display|default:'Weather watch' }}</span><p style="margin-top:1rem">{{ alert.title }}</p><p>{{ alert.description|truncatewords:28 }}</p>{% endwith %}{% else %}<span class="status-pill neutral">No active alert</span><p style="margin-top:1rem">Review recent rainfall and field activity before making an irrigation or planting change.</p>{% endif %}
+    <div class="button-row"><a class="btn btn-brand" href="{% url 'agricultural_data:farmer_history' %}">Open farm history</a><button class="btn btn-outline-brand" type="button" data-ai-open>Ask AI</button></div>
+  </aside>
+</div>
+
+<div class="two-grid" style="margin-top:1.25rem">
+  <section class="app-card"><div class="table-toolbar" style="padding:0 0 1rem"><h2 style="font-size:1.15rem;margin:0">Upcoming tasks</h2><a href="{% url 'farms:farm_list' %}">Manage farms</a></div><div class="object-list">{% for task in upcoming_tasks %}<div class="object-row"><div><h3>{{ task.title }}</h3><p>{{ task.farm.name }} · due {{ task.due_date|date:'M j, Y' }}</p></div><span class="status-pill {% if task.due_date < today %}danger{% else %}info{% endif %}">Planned</span></div>{% empty %}<p class="muted">No upcoming tasks. Add tasks from a farm detail page.</p>{% endfor %}</div></section>
+  <section class="app-card"><div class="table-toolbar" style="padding:0 0 1rem"><h2 style="font-size:1.15rem;margin:0">Recent decisions</h2><a href="{% url 'decisions:list' %}">Decision history</a></div><div class="timeline">{% for decision in recent_decisions %}<a class="timeline-item" href="{% url 'decisions:detail' decision.pk %}"><strong>{{ decision.title|default:decision.get_decision_type_display }}</strong><p>{{ decision.decision_date|date:'M j, Y' }} · {{ decision.farm.name }}</p></a>{% empty %}<p class="muted">No decisions recorded yet.</p>{% endfor %}</div></section>
+</div>
+{% endblock %}

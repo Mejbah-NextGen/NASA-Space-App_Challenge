@@ -1,0 +1,21 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Farm Analysis{% endblock %}{% block page_title %}Farm Analysis{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Consent-aware analysis</span><h1>Shared farm context</h1><p>Only farms covered by an active consultation consent appear here. Revocation removes access immediately.</p></div><a class="btn btn-outline-brand" href="{% url 'agriculturalist:questions' %}">Farmer questions</a></div>
+<div class="content-stack">
+  {% for consent in consents %}
+    <article class="app-card">
+      <div class="page-head" style="margin-bottom:1rem"><div><span class="status-pill success">{{ consent.get_scope_display }}</span><h2 style="font-size:1.35rem;margin:.65rem 0 .2rem">{{ consent.farm.name }}</h2><p>{{ consent.farmer.display_name }} · {{ consent.farm.upazila|default:consent.farm.district }}, {{ consent.farm.district }}</p></div><a class="btn btn-brand" href="{% url 'agriculturalist:question_detail' consent.consultation_id %}">Open authorized case</a></div>
+      <div class="metric-grid">
+        <div class="metric-card"><span class="metric-label">Land area</span><strong class="metric-value">{{ consent.farm.land_area }}</strong><small>{{ consent.farm.get_area_unit_display }}</small></div>
+        <div class="metric-card"><span class="metric-label">Fields</span><strong class="metric-value">{{ consent.farm.fields.count }}</strong><small>Shared farm fields</small></div>
+        <div class="metric-card"><span class="metric-label">Activities</span><strong class="metric-value">{{ consent.farm.activities.count }}</strong><small>Recorded farm events</small></div>
+        <div class="metric-card"><span class="metric-label">Saved scenarios</span><strong class="metric-value">{{ consent.farm.simulation_scenarios.count }}</strong><small>Farmer-created results</small></div>
+      </div>
+      {% if consent.scope == 'FULL' %}<div class="two-grid" style="margin-top:1rem"><div><h3 style="font-size:1.05rem">Fields and crops</h3><div class="object-list">{% for field in consent.farm.fields.all %}<div class="object-row"><div><strong>{{ field.name }}</strong><p>{{ field.area }} {{ field.get_area_unit_display }} · {{ field.get_soil_type_display }}</p>{% for planting in field.plantings.all|slice:':2' %}<small>{{ planting.crop }} · {{ planting.get_status_display }}</small>{% empty %}<small class="muted">No crop record</small>{% endfor %}</div><span class="status-pill info">{{ field.get_status_display }}</span></div>{% empty %}<p class="muted">No fields recorded.</p>{% endfor %}</div></div><div><h3 style="font-size:1.05rem">Data-use boundary</h3><div class="data-state"><strong>Active consent</strong>Granted {{ consent.granted_at|date:'M j, Y H:i' }} for this consultation only. Use this information only to respond to the assigned case.</div><p class="muted" style="margin-top:1rem">Private farm information must not be copied into public learning content or unrelated cases.</p></div></div>{% else %}<div class="data-state"><strong>Summary consent</strong>Field-level details remain hidden. Ask the Farmer to update consent if more context is essential.</div>{% endif %}
+    </article>
+  {% empty %}
+    <div class="empty-state"><div class="empty-icon"><i data-lucide="shield-check"></i></div><h2>No actively shared farms</h2><p>An assigned consultation and unrevoked Farmer consent are required before private farm context appears.</p><a class="btn btn-brand" href="{% url 'agriculturalist:questions' %}">View assigned cases</a></div>
+  {% endfor %}
+</div>
+{% endblock %}

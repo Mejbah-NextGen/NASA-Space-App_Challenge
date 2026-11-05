@@ -1,0 +1,16 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Agriculturalist Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Agriculturalist workspace</span><h1>Welcome back, {{ user.display_name|truncatewords:2 }}</h1><p>Review authorized farmer cases, evidence, and professional recommendations.</p></div><a class="btn btn-brand" href="{% url 'agriculturalist:questions' %}"><i data-lucide="messages-square"></i> Open questions</a></div>
+<div class="metric-grid">
+  <div class="metric-card success"><span class="metric-label">Assigned farmers</span><strong class="metric-value">{{ assigned_farmer_count }}</strong><small>Authorized relationships</small></div>
+  <div class="metric-card warning"><span class="metric-label">Pending consultations</span><strong class="metric-value">{{ pending_consultation_count }}</strong><small>Require review or reply</small></div>
+  <div class="metric-card info"><span class="metric-label">Completed</span><strong class="metric-value">{{ completed_consultation_count }}</strong><small>Resolved consultations</small></div>
+  <div class="metric-card"><span class="metric-label">Recommendations</span><strong class="metric-value">{{ active_recommendation_count }}</strong><small>Draft or published</small></div>
+</div>
+<div class="split-grid" style="margin-top:1.25rem">
+  <section class="app-card"><div class="table-toolbar" style="padding:0 0 1rem"><h2 style="font-size:1.2rem;margin:0">Recent farmer questions</h2><a href="{% url 'agriculturalist:questions' %}">View inbox</a></div><div class="object-list">{% for consultation in recent_consultations %}<a class="object-row" href="{% url 'agriculturalist:question_detail' consultation.pk %}"><div><h3>{{ consultation.title }}</h3><p>{{ consultation.farmer.display_name }}{% if consultation.farm %} · {{ consultation.farm.name }}{% endif %}</p></div><span class="status-pill info">{{ consultation.get_status_display }}</span></a>{% empty %}<div class="empty-state"><div class="empty-icon"><i data-lucide="message-circle"></i></div><h3>No assigned questions</h3><p>New cases will appear after an authorized assignment.</p></div>{% endfor %}</div></section>
+  <aside class="app-card"><span class="eyebrow">Regional weather</span><h2 style="font-size:1.2rem">Active notices</h2>{% for alert in weather_alerts %}<div class="object-row"><div><h3>{{ alert.title }}</h3><p>{{ alert.region.name|default:'Regional' }} · {{ alert.starts_at|date:'M j' }}</p></div><span class="status-pill warning">{{ alert.get_severity_display }}</span></div>{% empty %}<p class="muted">No active weather alerts.</p>{% endfor %}<a class="btn btn-outline-brand w-100" style="margin-top:1rem" href="{% url 'agriculturalist:weather' %}">Weather &amp; alerts</a></aside>
+</div>
+{% endblock %}

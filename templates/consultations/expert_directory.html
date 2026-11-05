@@ -1,0 +1,11 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block title %}Ask an Expert{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Verified support</span><h1>Ask an Expert</h1><p>Browse approved Agriculturalists, review their qualifications, and start a private consultation.</p></div><a class="button button-secondary" href="{% url 'farmer_consultations:list' %}">My consultations</a></div>
+<form class="filter-bar card" method="get"><div><label for="expertSearch">Search experts</label><input id="expertSearch" name="q" value="{{ request.GET.q }}" placeholder="Name, specialty, organization"></div><div><label for="expertSpecialty">Specialization</label><input id="expertSpecialty" name="specialization" value="{{ request.GET.specialization }}" placeholder="Crop, soil, irrigation"></div><button class="button button-primary" type="submit">Search</button></form>
+<div class="card-grid three-column">
+{% for expert in experts %}<article class="card expert-card"><div class="avatar avatar-large">{{ expert.full_name|first|upper }}</div><span class="status-pill status-success">Verified Agriculturalist</span><h2>{{ expert.display_name }}</h2><p><strong>{{ expert.agriculturalist_profile.specialization }}</strong></p><p>{{ expert.agriculturalist_profile.qualifications|truncatewords:24 }}</p><p class="muted">{{ expert.agriculturalist_profile.organization }}{% if expert.district %} · {{ expert.district }}{% endif %}</p><a class="button button-primary" href="{% url 'farmer_consultations:create' %}?expert={{ expert.pk }}">Request consultation</a></article>
+{% empty %}<div class="empty-state"><h2>No experts match those filters</h2><p>Try a broader search. Only approved Agriculturalists appear here.</p></div>{% endfor %}
+</div>
+{% include "consultations/_pagination.html" %}
+{% endblock %}

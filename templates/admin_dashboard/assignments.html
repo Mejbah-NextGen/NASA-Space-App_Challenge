@@ -1,0 +1,11 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}Expert Assignments{% endblock %}
+{% block page_title %}Expert Assignments{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Authorized relationships</span><h1>Expert assignments</h1><p>Assign or reassign a verified Agriculturalist to an active consultation. Farm details still require the Farmer’s explicit consent.</p></div></div>
+<div class="split-grid" style="margin-bottom:1.25rem">
+  <form method="post" action="{% url 'administration:assignment_action' %}" class="form-card" onsubmit="return confirm('Assign this Agriculturalist to the selected consultation?')">{% csrf_token %}<h2 style="font-size:1.2rem">Assign or reassign a case</h2>{{ assignment_form.as_p }}<button class="btn btn-brand" type="submit">Save assignment</button></form>
+  <aside class="app-card"><span class="eyebrow">Awaiting assignment</span><h2 style="font-size:1.2rem">Pending consultations</h2>{% for consultation in unassigned_consultations %}<div class="object-row"><div><strong>{{ consultation.title }}</strong><p>{{ consultation.farmer.display_name }}</p></div><span class="status-pill warning">Pending</span></div>{% empty %}<p class="muted">No unassigned active consultations.</p>{% endfor %}</aside>
+</div>
+<div class="table-card"><div class="table-responsive"><table class="data-table"><thead><tr><th>Consultation</th><th>Farmer</th><th>Agriculturalist</th><th>Assigned</th><th>Status</th></tr></thead><tbody>{% for assignment in assignments %}<tr><td><strong>{{ assignment.consultation.title }}</strong></td><td>{{ assignment.farmer.display_name }}</td><td>{{ assignment.agriculturalist.display_name }}</td><td>{{ assignment.assigned_at|date:'M j, Y H:i' }}</td><td><span class="status-pill {% if assignment.is_active %}success{% else %}neutral{% endif %}">{% if assignment.is_active %}Active{% else %}Ended{% endif %}</span></td></tr>{% empty %}<tr><td colspan="5">No expert assignments.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

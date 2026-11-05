@@ -1,0 +1,19 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% block title %}System Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Safe configuration view</span><h1>Platform settings</h1><p>Sensitive integration values are environment-managed and are never shown or edited in this interface.</p></div></div>
+<div class="two-grid">{% for name, enabled in integration_status.items %}<div class="app-card"><span class="eyebrow">Configuration</span><h2 style="font-size:1.2rem">{{ name }}</h2><span class="status-pill {% if enabled %}success{% else %}neutral{% endif %}">{% if enabled %}Enabled{% else %}Not enabled{% endif %}</span></div>{% endfor %}</div>
+<div class="app-card" style="margin-top:1.25rem"><h2 style="font-size:1.2rem">Environment-controlled security</h2><p>Secrets, host allowlists, secure cookies, HTTPS redirect, HSTS, database credentials, weather provider endpoints, and AI provider credentials are configured in deployment environment variables. Changing them requires an authorized deployment, which preserves reviewability and avoids arbitrary runtime settings.</p></div>
+<section class="app-card" style="margin-top:1.25rem">
+  <h2 style="font-size:1.2rem">Public, non-secret platform settings</h2>
+  <p>Only records explicitly marked public are editable here. Environment variables and credentials are never loaded into this form.</p>
+  {% for setting, form in public_setting_forms %}
+    <form method="post" action="{% url 'administration:public_setting_update' setting.pk %}" class="form-card" style="margin-top:1rem">
+      {% csrf_token %}<h3 style="font-size:1rem">{{ setting.key }}</h3>
+      {{ form.as_p }}
+      <div class="form-actions"><button class="btn btn-outline-brand" type="submit">Update public setting</button></div>
+    </form>
+  {% empty %}<div class="empty-state"><p>No public platform settings are configured. Sensitive settings remain environment-managed.</p></div>{% endfor %}
+</section>
+{% endblock %}

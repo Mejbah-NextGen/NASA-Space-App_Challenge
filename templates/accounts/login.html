@@ -1,0 +1,37 @@
+{% extends 'public/base_public.html' %}
+{% block title %}Log in · Farm Time Machine{% endblock %}
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-visual-copy">
+      <span class="section-kicker">Secure workspace</span>
+      <h1>Welcome back to your farm’s story.</h1>
+      <p>Continue to saved farms, historical comparisons, expert conversations, or platform administration. Your role is resolved securely after sign-in.</p>
+      <div class="app-card" style="margin-top:2rem;background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)">
+        <span class="eyebrow" style="color:var(--lime)">FIELD PREVIEW</span>
+        <h2 style="color:#fff">Past conditions. Better context.</h2>
+        <p style="color:#c5d8ce">Review rainfall, heat, decisions, and field activities together—always with source and data-state labels.</p>
+      </div>
+    </div>
+  </div>
+  <div class="auth-panel">
+    <div class="auth-card">
+      <span class="eyebrow">Farm Time Machine</span>
+      <h1>Sign in to your account</h1>
+      <p>Your workspace opens automatically based on your server-assigned role.</p>
+      {% if rate_limited %}<div class="app-alert app-alert-error">Too many attempts. Please wait five minutes before trying again.</div>{% endif %}
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <p>{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</p>
+        <p>{{ form.password.label_tag }}{{ form.password }}{{ form.password.errors }}</p>
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <div class="auth-links"><label><input type="checkbox" name="remember"> Remember me</label><a href="{% url 'accounts:password_reset' %}">Forgot password?</a></div>
+        <button class="btn btn-brand w-100" type="submit" {% if rate_limited %}disabled{% endif %}>Sign in securely</button>
+      </form>
+      <p style="margin-top:1.25rem;text-align:center">New here? <a href="{% url 'accounts:signup' %}"><strong>Create an account</strong></a></p>
+      <div class="small-meta" style="justify-content:center"><span><i data-lucide="shield-check"></i>CSRF protected</span><span><i data-lucide="lock-keyhole"></i>Server-side roles</span></div>
+    </div>
+  </div>
+</section>
+{% endblock %}

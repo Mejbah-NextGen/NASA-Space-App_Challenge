@@ -1,0 +1,81 @@
+{% extends "public/base_public.html" %}
+{% block title %}Farm Time Machine - Smarter agricultural decisions{% endblock %}
+{% block content %}
+<section class="public-hero py-5">
+  <div class="container py-lg-4">
+    <div class="row align-items-center g-4 g-xl-5">
+      <div class="col-lg-7">
+        <span class="eyebrow">{{ public_ui.home_eyebrow }}</span>
+        <h1 class="display-3 fw-black mt-3">{{ public_ui.home_title_first }}<br><span class="text-success">{{ public_ui.home_title_second }}</span></h1>
+        <p class="lead text-secondary col-xl-10">{{ public_ui.home_description }}</p>
+        <div class="d-flex flex-wrap gap-3 mt-4">
+          <a class="btn btn-success btn-lg" href="{% url 'agricultural_data:public_history' %}">{{ public_ui.home_explore_history }}</a>
+          <a class="btn btn-outline-success btn-lg" href="{% url 'accounts:signup' %}">{{ public_ui.home_get_started }}</a>
+        </div>
+        <div class="card border-0 shadow-sm mt-5 history-preview">
+          <div class="card-body">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+              <div><h2 class="h5 mb-1">Historical rainfall / {{ weather.district }} / 2016-2025</h2><small class="text-secondary">{% if history_is_demo %}Illustrative 10-year demonstration series{% else %}Imported historical observations{% endif %}</small></div>
+              <span class="data-badge {% if history_is_demo %}sample{% else %}verified{% endif %}">{% if history_is_demo %}Sample{% else %}Verified{% endif %}</span>
+            </div>
+            <div class="chart-wrap mt-3"><canvas id="homeRainfallChart" aria-label="Annual rainfall chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <article class="weather-hero-card text-white" aria-labelledby="weather-heading">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <span class="data-badge {% if weather.is_demo %}sample{% else %}verified{% endif %}">{{ weather.status_label }}</span>
+            <form method="get"><label class="visually-hidden" for="home-district">District</label><select class="form-select form-select-sm" id="home-district" name="district" onchange="this.form.submit()">{% for district in districts %}<option{% if district == weather.district %} selected{% endif %}>{{ district }}</option>{% endfor %}</select></form>
+          </div>
+          <h2 class="h3 mt-4" id="weather-heading">{{ weather.district }}, Bangladesh</h2>
+          {% if weather.available %}
+            <p class="display-1 fw-black my-3">{{ weather.temperature|default:'--' }}&deg;C</p>
+            <p class="fs-5">{{ weather.condition }}</p>
+            <div class="row border-top border-light border-opacity-25 pt-4 mt-4 g-3">
+              <div class="col-4"><small>Humidity</small><strong class="d-block fs-4">{{ weather.humidity|default:'--' }}%</strong></div>
+              <div class="col-4"><small>Rain chance</small><strong class="d-block fs-4">{{ weather.rain_probability|default:'--' }}%</strong></div>
+              <div class="col-4"><small>Wind</small><strong class="d-block fs-4">{{ weather.wind_speed|default:'--' }} km/h</strong></div>
+            </div>
+          {% else %}<div class="empty-state text-white"><h3>Weather unavailable</h3><p>{{ weather.error }}</p></div>{% endif %}
+          <div class="source-panel mt-4"><strong>Data status</strong><p class="mb-0">{{ weather.source }} · Updated {{ weather.updated_at }}</p>{% if weather.fallback_reason %}<small>{{ weather.fallback_reason }}</small>{% endif %}</div>
+          <a class="link-light d-inline-block mt-3" href="{% url 'weather:public_weather' %}?district={{ weather.district|urlencode }}">View 7-day outlook &rarr;</a>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5 bg-white" id="features">
+  <div class="container">
+    <span class="eyebrow">Built for better decisions</span><h2 class="display-6 fw-bold mt-2">From yesterday's evidence to today's action</h2>
+    <div class="row row-cols-2 row-cols-lg-3 g-3 g-lg-4 mt-3">
+      <div class="col"><a class="feature-card" href="{% url 'agricultural_data:public_history' %}"><span>01</span><h3>Farm History</h3><p>Compare rainfall, heat, and crop production through time.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'accounts:signup' %}"><span>02</span><h3>Farm Simulator</h3><p>Explore transparent rule-based crop scenarios.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'accounts:login' %}"><span>03</span><h3>AI Farm Assistant</h3><p>Ask grounded questions with clear caveats and sources.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'accounts:signup' %}"><span>04</span><h3>Expert Consultation</h3><p>Share selected farm information with verified professionals.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'weather:public_weather' %}"><span>05</span><h3>Weather &amp; Alerts</h3><p>See source-labelled forecasts and risk context.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'core:how_it_works' %}"><span>06</span><h3>Learning Center</h3><p>Use practical guides while understanding data limits.</p></a></div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5">
+  <div class="container">
+    <div class="row align-items-end"><div class="col-lg-7"><span class="eyebrow">How it works</span><h2 class="display-6 fw-bold mt-2">Evidence you can trace</h2></div><div class="col-lg-5"><p>Every actionable figure identifies its place, units, time window, freshness, and whether it is verified or a demonstration.</p></div></div>
+    <div class="row row-cols-1 row-cols-md-4 g-3 mt-3">
+      <div class="col"><article class="step-card"><strong>01</strong><h3>Observe</h3><p>Bring weather and agricultural data together.</p></article></div>
+      <div class="col"><article class="step-card"><strong>02</strong><h3>Understand</h3><p>Clean, aggregate, and explain gaps.</p></article></div>
+      <div class="col"><article class="step-card"><strong>03</strong><h3>Compare</h3><p>Explore years, seasons, and scenarios.</p></article></div>
+      <div class="col"><article class="step-card"><strong>04</strong><h3>Decide</h3><p>Save a plan or ask a verified expert.</p></article></div>
+    </div>
+  </div>
+</section>
+{{ history_chart|json_script:"home-history-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+(() => { const node = document.getElementById('home-history-data'); const canvas = document.getElementById('homeRainfallChart'); if (!node || !canvas || !window.Chart) return; const d = JSON.parse(node.textContent); new Chart(canvas, {type:'bar',data:{labels:d.years,datasets:[{label:'Rainfall (mm)',data:d.rainfall,backgroundColor:'#20734D',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'mm'}},x:{grid:{display:false}}}}}); })();
+</script>
+{% endblock %}
