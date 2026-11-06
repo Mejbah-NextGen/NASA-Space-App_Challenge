@@ -13,6 +13,7 @@ from django.views.generic import CreateView, DetailView, FormView, ListView, Red
 
 from apps.accounts.models import User
 from apps.accounts.permissions import AgriculturalistRequiredMixin, FarmerRequiredMixin
+from apps.accounts.verification import restrict_to_email_verified
 from apps.agricultural_data.views import history_context
 from apps.notifications.services import create_notification
 from apps.simulations.services import run_baseline
@@ -73,9 +74,9 @@ class ExpertDirectoryView(FarmerRequiredMixin, ListView):
         queryset = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
             is_active=True,
-            is_verified=True,
             agriculturalist_profile__is_approved=True,
-        ).select_related("agriculturalist_profile")
+        )
+        queryset = restrict_to_email_verified(queryset).select_related("agriculturalist_profile")
         query = self.request.GET.get("q", "").strip()
         specialization = self.request.GET.get("specialization", "").strip()
         if query:

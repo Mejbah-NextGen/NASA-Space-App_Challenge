@@ -39,6 +39,7 @@ INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.core.middleware.BrowserSecurityHeadersMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -115,8 +116,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Farm Time Machine <noreply@farmtime.local>")
+EMAIL_VERIFICATION_ENABLED = os.getenv("EMAIL_VERIFICATION_ENABLED", "false").lower() == "true"
 EMAIL_VERIFICATION_MAX_AGE = int(os.getenv("EMAIL_VERIFICATION_MAX_AGE", "86400"))
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "farm-time-machine"}}
+CACHES = {
+    "default": {
+        "BACKEND": os.getenv("CACHE_BACKEND", "django.core.cache.backends.locmem.LocMemCache"),
+        "LOCATION": os.getenv("CACHE_LOCATION", "farm-time-machine"),
+        "KEY_PREFIX": os.getenv("CACHE_KEY_PREFIX", "farm-time-machine"),
+    }
+}
+TRUST_X_FORWARDED_FOR = os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true"
+LOGIN_RATE_LIMIT = int(os.getenv("LOGIN_RATE_LIMIT", "10"))
+SUPPORT_RATE_LIMIT_PER_10_MINUTES = int(os.getenv("SUPPORT_RATE_LIMIT_PER_10_MINUTES", "5"))
 
 WEATHER_LIVE_ENABLED = os.getenv("WEATHER_LIVE_ENABLED", "false").lower() == "true"
 WEATHER_API_BASE_URL = os.getenv("WEATHER_API_BASE_URL", "https://api.open-meteo.com/v1/forecast")
@@ -125,7 +136,6 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_API_BASE_URL = os.getenv("AI_API_BASE_URL", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
 AI_RATE_LIMIT_PER_MINUTE = int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "10"))
-TRUST_X_FORWARDED_FOR = os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true"
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024

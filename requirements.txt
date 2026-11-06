@@ -2,6 +2,7 @@ Django>=5.2,<5.3
 Pillow>=11.2,<13
 python-dotenv>=1.1,<2
 requests>=2.32,<3
+redis>=5,<8
 whitenoise>=6.9,<7
 gunicorn>=23,<24
 psycopg[binary]>=3.2,<4

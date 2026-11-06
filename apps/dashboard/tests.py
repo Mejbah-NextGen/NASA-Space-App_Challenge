@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
@@ -46,3 +47,11 @@ class DashboardIntegrationTests(TestCase):
         )
         self.client.force_login(farmer)
         self.assertEqual(self.client.get(reverse("administration:dashboard")).status_code, 403)
+
+    def test_responsive_feature_grid_contract_matches_mobile_tablet_and_desktop_navigation(self):
+        css = (settings.BASE_DIR / "static" / "css" / "app.css").read_text(encoding="utf-8")
+        self.assertIn(".feature-grid { display: grid; grid-template-columns: repeat(2", css)
+        self.assertIn("@media (min-width: 768px)", css)
+        self.assertIn(".feature-grid { grid-template-columns: repeat(3", css)
+        self.assertIn("@media (min-width: 1200px)", css)
+        self.assertIn(".workspace-sidebar { display: flex; }", css)

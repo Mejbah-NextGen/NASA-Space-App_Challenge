@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 
-from .models import AreaUnit, Farm, Field, IrrigationType, SoilType
+from .models import AreaUnit, Farm, FarmActivity, Field, IrrigationType, SoilType
 
 
 class FarmOwnershipTests(TestCase):
@@ -39,4 +39,70 @@ class FarmOwnershipTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             field.full_clean()
+
+    def test_verified_farmer_can_create_update_field_and_record_activity(self):
+        self.client.force_login(self.owner)
+        create = self.client.post(
+            reverse("farms:farm_create"),
+            {
+                "name": "River Farm",
+                "district": "Kurigram",
+                "upazila": "Ulipur",
+                "village": "River Village",
+                "land_area": "3.00",
+                "area_unit": AreaUnit.ACRE,
+                "soil_type": SoilType.LOAM,
+                "irrigation_type": IrrigationType.RAINFED,
+                "description": "Workflow test farm.",
+            },
+        )
+        created_farm = Farm.objects.get(owner=self.owner, name="River Farm")
+        self.assertRedirects(create, reverse("farms:farm_detail", args=[created_farm.pk]))
+
+        update = self.client.post(
+            reverse("farms:farm_update", args=[created_farm.pk]),
+            {
+                "name": "River Farm Updated",
+                "district": "Kurigram",
+                "upazila": "Ulipur",
+                "village": "River Village",
+                "land_area": "3.00",
+                "area_unit": AreaUnit.ACRE,
+                "soil_type": SoilType.LOAM,
+                "irrigation_type": IrrigationType.RAINFED,
+                "description": "Updated workflow test farm.",
+            },
+        )
+        self.assertRedirects(update, reverse("farms:farm_detail", args=[created_farm.pk]))
+        created_farm.refresh_from_db()
+        self.assertEqual(created_farm.name, "River Farm Updated")
+
+        field_response = self.client.post(
+            reverse("farms:field_create", args=[created_farm.pk]),
+            {
+                "name": "East Field",
+                "area": "1.25",
+                "area_unit": AreaUnit.ACRE,
+                "soil_type": SoilType.LOAM,
+                "irrigation_type": IrrigationType.RAINFED,
+                "status": Field.Status.ACTIVE,
+                "description": "Field workflow record.",
+            },
+        )
+        self.assertRedirects(field_response, reverse("farms:farm_detail", args=[created_farm.pk]))
+        field = Field.objects.get(farm=created_farm, name="East Field")
+
+        activity_response = self.client.post(
+            reverse("farms:activity_create", args=[created_farm.pk]),
+            {
+                "field": field.pk,
+                "planting": "",
+                "activity_type": FarmActivity.ActivityType.IRRIGATION,
+                "activity_date": date(2026, 11, 6),
+                "details": "Checked soil moisture and irrigated briefly.",
+                "cost": "150.00",
+            },
+        )
+        self.assertRedirects(activity_response, reverse("farms:farm_detail", args=[created_farm.pk]))
+        self.assertTrue(FarmActivity.objects.filter(farm=created_farm, field=field).exists())
 

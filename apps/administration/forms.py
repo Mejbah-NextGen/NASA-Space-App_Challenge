@@ -2,6 +2,7 @@ from django import forms
 
 from apps.accounts.models import AgriculturalistVerification
 from apps.accounts.models import User
+from apps.accounts.verification import restrict_to_email_verified
 from apps.agricultural_data.models import AgriculturalDataset, DataImportJob, DataSource, Region
 from apps.consultations.models import Consultation
 from apps.core.models import PlatformSetting, SupportTicket
@@ -154,12 +155,12 @@ class ExpertAssignmentForm(forms.Form):
         self.fields["consultation"].queryset = Consultation.objects.filter(
             status__in=[Consultation.Status.PENDING, Consultation.Status.ASSIGNED, Consultation.Status.ACTIVE]
         ).select_related("farmer", "farm").order_by("-updated_at")
-        self.fields["agriculturalist"].queryset = User.objects.filter(
+        experts = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
             agriculturalist_profile__is_approved=True,
             is_active=True,
-            is_verified=True,
-        ).order_by("full_name")
+        )
+        self.fields["agriculturalist"].queryset = restrict_to_email_verified(experts).order_by("full_name")
 
 
 class WeatherAlertForm(forms.ModelForm):

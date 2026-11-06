@@ -12,6 +12,7 @@ from apps.accounts.models import User
 from apps.farms.models import AreaUnit, Crop, Farm
 from apps.notifications.models import Notification
 
+from .forms import ConsultationCreateForm
 from .models import Consultation, ConsultationMessage, ExpertRecommendation, FarmDataConsent
 
 
@@ -70,6 +71,28 @@ class ConsultationPermissionTests(TestCase):
             description="Rice leaves are turning yellow.",
             status=Consultation.Status.ASSIGNED,
         )
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_approved_unverified_expert_is_available_while_email_verification_is_disabled(self):
+        self.expert.is_verified = False
+        self.expert.save(update_fields=["is_verified"])
+
+        form = ConsultationCreateForm(farmer=self.farmer)
+        self.assertIn(self.expert, form.fields["agriculturalist"].queryset)
+        self.client.force_login(self.farmer)
+        response = self.client.get(reverse("farmer_consultations:expert_list"))
+        self.assertContains(response, self.expert.full_name)
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    def test_approved_unverified_expert_is_hidden_when_email_verification_is_enabled(self):
+        self.expert.is_verified = False
+        self.expert.save(update_fields=["is_verified"])
+
+        form = ConsultationCreateForm(farmer=self.farmer)
+        self.assertNotIn(self.expert, form.fields["agriculturalist"].queryset)
+        self.client.force_login(self.farmer)
+        response = self.client.get(reverse("farmer_consultations:expert_list"))
+        self.assertNotContains(response, self.expert.full_name)
 
     def test_farmer_can_create_assigned_consultation_with_consent(self):
         self.client.force_login(self.farmer)

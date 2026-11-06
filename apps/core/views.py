@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.db.models import Avg, Q, Sum
 from django.db.models.functions import ExtractYear
 from django.shortcuts import redirect
@@ -9,6 +11,24 @@ from apps.agricultural_data.views import DEMO_RAINFALL, DEMO_YEARS
 from apps.weather.services import available_districts, get_weather
 
 from .forms import SupportTicketForm
+
+
+def _support_request_allowed(request):
+    if request.user.is_authenticated:
+        identity = f"user:{request.user.pk}"
+    else:
+        remote_address = request.META.get("REMOTE_ADDR", "unknown").strip() or "unknown"
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "") if settings.TRUST_X_FORWARDED_FOR else ""
+        identity = f"ip:{forwarded.split(',')[0].strip() if forwarded else remote_address}"
+    key = f"support-rate:{identity}"
+    if cache.add(key, 1, timeout=600):
+        return True
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=600)
+        count = 1
+    return count <= settings.SUPPORT_RATE_LIMIT_PER_10_MINUTES
 
 
 class HomeView(TemplateView):
@@ -59,6 +79,15 @@ class StaticPageView(TemplateView):
 class HelpView(FormView):
     template_name = "public/help.html"
     form_class = SupportTicketForm
+
+    def post(self, request, *args, **kwargs):
+        if not _support_request_allowed(request):
+            form = self.get_form()
+            form.add_error(None, "Too many support requests. Please wait ten minutes and try again.")
+            response = self.form_invalid(form)
+            response.status_code = 429
+            return response
+        return super().post(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()

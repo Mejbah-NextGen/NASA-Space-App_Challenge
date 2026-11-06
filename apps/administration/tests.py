@@ -1,19 +1,21 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import AgriculturalistVerification, User
-from apps.agricultural_data.models import DataSource, Region
+from apps.agricultural_data.models import AgriculturalDataset, DataImportJob, DataSource, Region
 from apps.consultations.models import Consultation, ExpertAssignment, FarmDataConsent
 from apps.consultations.services import assign_consultation
 from apps.core.models import PlatformSetting, SupportTicket
-from apps.farms.models import AreaUnit, Farm
+from apps.farms.models import AreaUnit, Crop, Farm
 from apps.notifications.models import Notification
 from apps.weather.models import WeatherAlert
 
+from .forms import ExpertAssignmentForm
 from .models import AuditLog
 
 
@@ -42,12 +44,34 @@ class AdministrationWorkflowTests(TestCase):
         self.assertFalse(farmer.is_active)
         self.assertTrue(AuditLog.objects.filter(action="user.suspend", target_identifier=str(farmer.pk)).exists())
 
+    def test_admin_can_view_read_only_user_details(self):
+        farmer = User.objects.create_user(
+            email="detail-farmer@example.com",
+            password="StrongLocalPass@2026",
+            full_name="Detail Farmer",
+            role=User.Role.FARMER,
+        )
+        Farm.objects.create(
+            owner=farmer,
+            name="Detail Farm",
+            district="Kurigram",
+            land_area=Decimal("1.00"),
+            area_unit=AreaUnit.ACRE,
+        )
+
+        response = self.client.get(reverse("administration:user_detail", args=[farmer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, farmer.email)
+        self.assertEqual(response.context["farm_count"], 1)
+
     def test_admin_approval_enables_expert_access(self):
         expert = User.objects.create_user(
             email="applicant@example.com",
             password="StrongLocalPass@2026",
             full_name="Expert Applicant",
             role=User.Role.AGRICULTURALIST,
+            is_verified=True,
         )
         verification = AgriculturalistVerification.objects.create(agriculturalist=expert.agriculturalist_profile)
         response = self.client.post(
@@ -59,6 +83,68 @@ class AdministrationWorkflowTests(TestCase):
         expert.agriculturalist_profile.refresh_from_db()
         self.assertTrue(expert.is_verified)
         self.assertTrue(expert.agriculturalist_profile.is_approved)
+
+    def test_admin_can_reject_expert_application(self):
+        expert = User.objects.create_user(
+            email="rejected-applicant@example.com",
+            password="StrongLocalPass@2026",
+            full_name="Rejected Applicant",
+            role=User.Role.AGRICULTURALIST,
+            is_verified=True,
+        )
+        verification = AgriculturalistVerification.objects.create(agriculturalist=expert.agriculturalist_profile)
+
+        response = self.client.post(
+            reverse("administration:agriculturalist_review", args=[verification.pk]),
+            {"status": AgriculturalistVerification.Status.REJECTED, "notes": "Credentials could not be verified."},
+        )
+
+        self.assertRedirects(response, reverse("administration:agriculturalists"))
+        expert.refresh_from_db()
+        expert.agriculturalist_profile.refresh_from_db()
+        self.assertTrue(expert.is_verified)
+        self.assertFalse(expert.agriculturalist_profile.is_approved)
+        self.assertTrue(AuditLog.objects.filter(action="expert.rejected", target_identifier=str(expert.pk)).exists())
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    def test_professional_approval_does_not_bypass_email_verification_when_enabled(self):
+        expert = User.objects.create_user(
+            email="unverified-applicant@example.com",
+            password="StrongLocalPass@2026",
+            full_name="Unverified Applicant",
+            role=User.Role.AGRICULTURALIST,
+            is_verified=False,
+        )
+        verification = AgriculturalistVerification.objects.create(agriculturalist=expert.agriculturalist_profile)
+        self.client.post(
+            reverse("administration:agriculturalist_review", args=[verification.pk]),
+            {"status": AgriculturalistVerification.Status.APPROVED, "notes": "Professional credentials approved."},
+        )
+        expert.refresh_from_db()
+        expert.agriculturalist_profile.refresh_from_db()
+        self.assertTrue(expert.agriculturalist_profile.is_approved)
+        self.assertFalse(expert.is_verified)
+        self.client.force_login(expert)
+        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 403)
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_approved_expert_is_not_blocked_by_email_verification_when_disabled(self):
+        expert = User.objects.create_user(
+            email="temporarily-unverified-applicant@example.com",
+            password="StrongLocalPass@2026",
+            full_name="Approved Applicant",
+            role=User.Role.AGRICULTURALIST,
+            is_verified=False,
+        )
+        verification = AgriculturalistVerification.objects.create(agriculturalist=expert.agriculturalist_profile)
+        self.client.post(
+            reverse("administration:agriculturalist_review", args=[verification.pk]),
+            {"status": AgriculturalistVerification.Status.APPROVED, "notes": "Credentials approved."},
+        )
+        expert.agriculturalist_profile.refresh_from_db()
+        self.assertTrue(expert.agriculturalist_profile.is_approved)
+        self.client.force_login(expert)
+        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 200)
 
     def test_csv_export_escapes_formula_prefixes(self):
         User.objects.create_user(
@@ -101,6 +187,25 @@ class AdministrationWorkflowTests(TestCase):
         self.assertEqual(consultation.agriculturalist, expert)
         self.assertEqual(consultation.status, Consultation.Status.ASSIGNED)
         self.assertTrue(ExpertAssignment.objects.filter(consultation=consultation, agriculturalist=expert).exists())
+
+    def test_assignment_form_applies_email_verification_filter_only_when_enabled(self):
+        expert = User.objects.create_user(
+            email="filter-expert@example.com",
+            password="StrongLocalPass@2026",
+            full_name="Filter Expert",
+            role=User.Role.AGRICULTURALIST,
+            is_verified=False,
+        )
+        expert.agriculturalist_profile.is_approved = True
+        expert.agriculturalist_profile.save(update_fields=["is_approved"])
+
+        for enabled, should_be_available in ((False, True), (True, False)):
+            with self.subTest(email_verification_enabled=enabled), self.settings(
+                EMAIL_VERIFICATION_ENABLED=enabled
+            ):
+                form = ExpertAssignmentForm()
+                is_available = form.fields["agriculturalist"].queryset.filter(pk=expert.pk).exists()
+                self.assertEqual(is_available, should_be_available)
 
     def test_admin_reassignment_revokes_old_consent_and_records_previous_expert(self):
         farmer = User.objects.create_user(
@@ -350,3 +455,121 @@ class AdministrationWorkflowTests(TestCase):
         self.assertEqual(denied.status_code, 404)
         private.refresh_from_db()
         self.assertEqual(private.value["credential_reference"], "never-show")
+
+    def test_admin_can_manage_source_dataset_and_crop_catalog_with_audits(self):
+        source_response = self.client.post(
+            reverse("administration:data_source_create"),
+            {
+                "name": "Reviewed crop bureau",
+                "provider": "Test provider",
+                "kind": DataSource.Kind.CROP,
+                "url": "https://example.test/source",
+                "description": "Reviewed test source.",
+                "attribution": "Test attribution",
+                "geographic_coverage": "Kurigram",
+                "update_frequency": "Annual",
+                "limitations": "Test-only records.",
+                "is_active": "on",
+                "last_updated_at": "",
+            },
+        )
+        self.assertRedirects(source_response, reverse("administration:data"))
+        source = DataSource.objects.get(name="Reviewed crop bureau")
+        self.assertTrue(AuditLog.objects.filter(action="data_source.created", target_identifier=str(source.pk)).exists())
+
+        dataset_response = self.client.post(
+            reverse("administration:dataset_create"),
+            {
+                "source": source.pk,
+                "title": "Reviewed crop dataset",
+                "slug": "reviewed-crop-dataset",
+                "description": "Validated annual production observations.",
+                "status": AgriculturalDataset.Status.VERIFIED,
+                "geographic_coverage": "Kurigram",
+                "date_start": "2020-01-01",
+                "date_end": "2025-12-31",
+                "units": "tonnes and tonnes/hectare",
+                "quality_notes": "Reviewed for test coverage.",
+                "metadata": '{"license": "test"}',
+            },
+        )
+        self.assertRedirects(dataset_response, reverse("administration:data"))
+        dataset = AgriculturalDataset.objects.get(slug="reviewed-crop-dataset")
+        self.assertTrue(
+            AuditLog.objects.filter(action="agricultural_dataset.created", target_identifier=str(dataset.pk)).exists()
+        )
+
+        crop_response = self.client.post(
+            reverse("administration:crop_create"),
+            {"name": "Lentil", "variety": "BARI Masur", "is_supported": "on"},
+        )
+        self.assertRedirects(crop_response, reverse("administration:data"))
+        crop = Crop.objects.get(name="Lentil", variety="BARI Masur")
+        toggle = self.client.post(
+            reverse("administration:crop_toggle", args=[crop.pk]),
+            {"action": "disable"},
+        )
+        self.assertRedirects(toggle, reverse("administration:data"))
+        crop.refresh_from_db()
+        self.assertFalse(crop.is_supported)
+        self.assertTrue(
+            AuditLog.objects.filter(action="crop_catalog.deactivated", target_identifier=str(crop.pk)).exists()
+        )
+
+    def test_demo_source_cannot_back_a_verified_dataset(self):
+        source = DataSource.objects.create(
+            name="Demo-only source",
+            provider="Local demonstration",
+            kind=DataSource.Kind.CROP,
+            is_demo=True,
+        )
+        response = self.client.post(
+            reverse("administration:dataset_create"),
+            {
+                "source": source.pk,
+                "title": "Invalid verified sample",
+                "slug": "invalid-verified-sample",
+                "description": "This must not be accepted.",
+                "status": AgriculturalDataset.Status.VERIFIED,
+                "geographic_coverage": "Kurigram",
+                "date_start": "2020-01-01",
+                "date_end": "2025-12-31",
+                "units": "tonnes",
+                "quality_notes": "Sample only.",
+                "metadata": "{}",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "demonstration source cannot be marked verified")
+        self.assertFalse(AgriculturalDataset.objects.filter(slug="invalid-verified-sample").exists())
+
+    def test_admin_csv_import_failure_is_recorded_and_visible(self):
+        source = DataSource.objects.create(
+            name="Import test source",
+            provider="Local test provider",
+            kind=DataSource.Kind.HISTORICAL_WEATHER,
+            is_demo=True,
+        )
+        dataset = AgriculturalDataset.objects.create(
+            source=source,
+            title="Import test dataset",
+            slug="import-test-dataset",
+            status=AgriculturalDataset.Status.SAMPLE,
+        )
+        upload = SimpleUploadedFile(
+            "broken.csv",
+            b"district,rainfall_mm\nKurigram,12\n",
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("administration:data"),
+            {"dataset": dataset.pk, "kind": DataImportJob.Kind.WEATHER, "csv_file": upload},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        job = DataImportJob.objects.get(dataset=dataset)
+        self.assertEqual(job.status, DataImportJob.Status.FAILED)
+        self.assertTrue(job.errors)
+        self.assertContains(response, "Import failed")

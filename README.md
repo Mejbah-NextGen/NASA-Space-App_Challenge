@@ -1,3 +1,5 @@
+* [ ] 
+
 # Farm Time Machine
 
 Farm Time Machine is a public-first, role-based agricultural decision-support platform built with Django. Visitors can explore clearly sourced weather and historical agricultural information without an account. Farmers can manage farms, compare deterministic scenarios, record decisions, and consult verified Agriculturalists. Agriculturalists work only with assigned and consented cases. Platform Admins manage accounts, expert verification, content, data provenance, and audit records.
@@ -92,34 +94,45 @@ python manage.py runserver
 
 The following accounts are created only by the guarded `seed_demo` command:
 
-| Role | Email | Password |
-|---|---|---|
-| Admin | `admin@farmtime.test` | `FarmDemo@2026!` |
-| Agriculturalist | `agriculturalist@farmtime.test` | `FarmDemo@2026!` |
-| Farmer | `farmer@farmtime.test` | `FarmDemo@2026!` |
+| Role            | Email                              | Password           |
+| --------------- | ---------------------------------- | ------------------ |
+| Admin           | `admin@farmtime.test`            | `FarmDemo@2026!` |
+| Admin           | `operations.admin@farmtime.test` | `FarmDemo@2026!` |
+| Agriculturalist | `agriculturalist@farmtime.test`  | `FarmDemo@2026!` |
+| Agriculturalist | `soil.expert@farmtime.test`      | `FarmDemo@2026!` |
+| Farmer          | `farmer@farmtime.test`           | `FarmDemo@2026!` |
+| Farmer          | `salma.farmer@farmtime.test`     | `FarmDemo@2026!` |
 
 `seed_demo` refuses to run unless the explicit development settings module is active with `DEBUG=True` and `DEMO_MODE=True`. It is idempotent and never runs during deployment. The password above is public development data; never reuse it for a real account.
 
-## Environment configuration
+See [README_DEMO.md](README_DEMO.md) for the account personas, seeded records, and role-by-role walkthroughs.
+
+Environment configuration
 
 Copy `.env.example` to `.env`. Important variables:
 
-| Variable | Purpose |
-|---|---|
+| Variable                   | Purpose                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------- |
 | `DJANGO_SETTINGS_MODULE` | `config.settings.development` locally; `config.settings.production` in deployment |
-| `DJANGO_SECRET_KEY` | Required long random production secret |
-| `DJANGO_DEBUG` | Development-only debug switch |
-| `DATABASE_URL` | PostgreSQL connection URL; empty uses local SQLite |
-| `DEMO_MODE` | Allows clearly labeled demonstration fallbacks and demo seeding |
-| `WEATHER_LIVE_ENABLED` | Enables backend Open-Meteo calls |
-| `WEATHER_API_BASE_URL` | Fixed weather provider endpoint |
-| `AI_API_KEY` | Optional server-side provider credential |
-| `AI_API_BASE_URL` | Optional OpenAI-compatible base URL |
-| `AI_MODEL` | Provider model identifier |
-| `ALLOWED_HOSTS` | Production host allowlist |
-| `CSRF_TRUSTED_ORIGINS` | HTTPS origins allowed for CSRF |
+| `DJANGO_SECRET_KEY`      | Required long random production secret                                                |
+| `DJANGO_DEBUG`           | Development-only debug switch                                                         |
+| `DATABASE_URL`           | PostgreSQL connection URL; empty uses local SQLite                                    |
+| `CACHE_BACKEND`          | Shared atomic cache backend required in production                                    |
+| `CACHE_LOCATION`         | Cache/Redis connection location                                                       |
+| `EMAIL_BACKEND`          | Real delivery backend required in production                                          |
+| `EMAIL_VERIFICATION_ENABLED` | Temporarily `false`; set `true` to restore signed-link verification enforcement   |
+| `DEMO_MODE`              | Allows clearly labeled demonstration fallbacks and demo seeding                       |
+| `WEATHER_LIVE_ENABLED`   | Enables backend Open-Meteo calls                                                      |
+| `WEATHER_API_BASE_URL`   | Fixed weather provider endpoint                                                       |
+| `AI_API_KEY`             | Optional server-side provider credential                                              |
+| `AI_API_BASE_URL`        | Optional OpenAI-compatible base URL                                                   |
+| `AI_MODEL`               | Provider model identifier                                                             |
+| `ALLOWED_HOSTS`          | Production host allowlist                                                             |
+| `CSRF_TRUSTED_ORIGINS`   | HTTPS origins allowed for CSRF                                                        |
 
 Never commit `.env`, API credentials, databases, or private uploaded media.
+
+Email verification is currently disabled by default, so new accounts can sign in immediately and no signup verification message is sent. Agriculturalist professional approval remains required. Migration `accounts.0002` grandfathers existing accounts, and the signed-link workflow is preserved behind `EMAIL_VERIFICATION_ENABLED=true` for the planned rollout.
 
 ## Weather integration
 
@@ -186,9 +199,13 @@ Run deployment checks with production-like environment values:
 
 ```powershell
 $env:DJANGO_SETTINGS_MODULE = "config.settings.production"
-$env:DJANGO_SECRET_KEY = "replace-with-a-long-random-production-secret"
+$env:DJANGO_SECRET_KEY = "check-only-7Jq2Wr9Lp4Nx8Cv6Bk3Ze5Tm1Hs0Df9Yu2Aa8"
 $env:ALLOWED_HOSTS = "farm.example.com"
 $env:CSRF_TRUSTED_ORIGINS = "https://farm.example.com"
+$env:DATABASE_URL = "postgresql://user:password@db-host:5432/farm_time_machine"
+$env:EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+$env:CACHE_BACKEND = "django.core.cache.backends.redis.RedisCache"
+$env:CACHE_LOCATION = "redis://cache-host:6379/1"
 python manage.py check --deploy
 ```
 
@@ -220,6 +237,7 @@ Do not run `seed_demo` in production. Do not expose the default demo password. S
 
 Additional documentation:
 
+- [Demo guide](README_DEMO.md)
 - [Architecture](docs/architecture.md)
 - [Database](docs/database.md)
 - [Roles and permissions](docs/roles-permissions.md)

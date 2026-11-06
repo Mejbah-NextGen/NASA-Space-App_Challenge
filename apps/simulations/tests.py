@@ -42,3 +42,25 @@ class SimulationBaselineTests(TestCase):
         response = self.client.get(reverse("simulations:detail", args=[self.scenario.pk]))
         self.assertEqual(response.status_code, 404)
 
+    def test_farmer_can_run_and_save_a_scenario_through_the_form(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("simulations:simulator"),
+            {
+                "name": "Wet-season comparison",
+                "farm": self.farm.pk,
+                "field": "",
+                "crop": self.crop.pk,
+                "planting_date": "2026-06-15",
+                "temperature_assumption": "34.0",
+                "rainfall_assumption": "850.0",
+                "irrigation_scenario": SimulationScenario.IrrigationScenario.MODERATE,
+                "historical_year": "2025",
+                "season": SimulationScenario.Season.AMAN,
+            },
+        )
+        saved = SimulationScenario.objects.get(owner=self.user, name="Wet-season comparison")
+        self.assertRedirects(response, reverse("simulations:detail", args=[saved.pk]))
+        self.assertTrue(hasattr(saved, "result"))
+        self.assertIn("not a yield forecast", saved.result.disclaimer)
+

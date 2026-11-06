@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from .models import AuditLog
 
 
@@ -10,8 +12,8 @@ def record_audit(request, action, target=None, result=AuditLog.Result.SUCCESS, m
         for key, value in (metadata or {}).items()
         if str(key).lower() not in SENSITIVE_KEYS
     }
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    address = (forwarded.split(",")[0] if forwarded else request.META.get("REMOTE_ADDR")) or None
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "") if settings.TRUST_X_FORWARDED_FOR else ""
+    address = (forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR")) or None
     return AuditLog.objects.create(
         actor=request.user if request.user.is_authenticated else None,
         action=action,

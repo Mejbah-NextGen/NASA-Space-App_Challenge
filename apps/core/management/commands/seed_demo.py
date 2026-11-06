@@ -24,10 +24,10 @@ from apps.agricultural_data.models import (
 from apps.consultations.models import (
     Consultation,
     ConsultationMessage,
+    ExpertAssignment,
     ExpertRecommendation,
     FarmDataConsent,
 )
-from apps.consultations.services import assign_consultation
 from apps.core.models import SupportTicket
 from apps.decisions.models import DecisionOutcome, FarmingDecision
 from apps.farms.models import Crop, CropPlanting, Farm, FarmActivity, FarmTask, Field
@@ -58,11 +58,25 @@ class Command(BaseCommand):
                 is_staff=True,
                 is_superuser=True,
             )
+            operations_admin = self._user(
+                "operations.admin@farmtime.test",
+                "Nadia Islam",
+                User.Role.ADMIN,
+                district="Dhaka",
+                is_staff=True,
+                is_superuser=False,
+            )
             expert = self._user(
                 "agriculturalist@farmtime.test",
                 "Dr. Ayesha Rahman",
                 User.Role.AGRICULTURALIST,
                 district="Kurigram",
+            )
+            soil_expert = self._user(
+                "soil.expert@farmtime.test",
+                "Dr. Farhana Akter",
+                User.Role.AGRICULTURALIST,
+                district="Rangpur",
             )
             farmer = self._user(
                 "farmer@farmtime.test",
@@ -71,10 +85,25 @@ class Command(BaseCommand):
                 district="Kurigram",
                 upazila="Ulipur",
             )
+            salma = self._user(
+                "salma.farmer@farmtime.test",
+                "Salma Begum",
+                User.Role.FARMER,
+                district="Rangpur",
+                upazila="Kaunia",
+            )
 
             FarmerProfile.objects.update_or_create(
                 user=farmer,
                 defaults={"experience": FarmerProfile.Experience.SIX_TO_TEN, "preferred_area_unit": "ACRE"},
+            )
+            FarmerProfile.objects.update_or_create(
+                user=salma,
+                defaults={
+                    "experience": FarmerProfile.Experience.ONE_TO_FIVE,
+                    "preferred_area_unit": "ACRE",
+                    "bio": "Demonstration vegetable grower testing field records and expert consultations.",
+                },
             )
             expert_profile, _ = AgriculturalistProfile.objects.update_or_create(
                 user=expert,
@@ -94,6 +123,28 @@ class Command(BaseCommand):
                 defaults={
                     "status": AgriculturalistVerification.Status.APPROVED,
                     "reviewer": admin_user,
+                    "notes": "Approved demonstration profile. Not a real professional credential.",
+                    "reviewed_at": timezone.now(),
+                },
+            )
+            soil_expert_profile, _ = AgriculturalistProfile.objects.update_or_create(
+                user=soil_expert,
+                defaults={
+                    "specialization": "Soil health, vegetable crops, and irrigation management",
+                    "qualifications": "MSc in Soil Science; demonstration credentials for local development only.",
+                    "organization": "Rangpur Farm Advisory Lab",
+                    "license_number": "DEMO-SOIL-2026",
+                    "years_experience": 7,
+                    "bio": "Supports soil-moisture checks, vegetable crop care, and practical irrigation planning.",
+                    "is_approved": True,
+                    "approved_at": timezone.now(),
+                },
+            )
+            AgriculturalistVerification.objects.update_or_create(
+                agriculturalist=soil_expert_profile,
+                defaults={
+                    "status": AgriculturalistVerification.Status.APPROVED,
+                    "reviewer": operations_admin,
                     "notes": "Approved demonstration profile. Not a real professional credential.",
                     "reviewed_at": timezone.now(),
                 },
@@ -227,6 +278,76 @@ class Command(BaseCommand):
                 },
             )
 
+            salma_farm, _ = Farm.objects.update_or_create(
+                owner=salma,
+                name="Salma Vegetable Farm",
+                defaults={
+                    "district": "Rangpur",
+                    "upazila": "Kaunia",
+                    "village": "Demo Riverside",
+                    "land_area": Decimal("0.90"),
+                    "area_unit": "ACRE",
+                    "soil_type": "SILT",
+                    "irrigation_type": "DRIP",
+                    "description": "A second private demonstration farm focused on vegetable workflows.",
+                    "is_archived": False,
+                },
+            )
+            salma_field, _ = Field.objects.update_or_create(
+                farm=salma_farm,
+                name="East Vegetable Plot",
+                defaults={
+                    "area": Decimal("0.60"),
+                    "area_unit": "ACRE",
+                    "soil_type": "SILT",
+                    "irrigation_type": "DRIP",
+                    "status": Field.Status.ACTIVE,
+                    "description": "Demonstration tomato plot with drip irrigation.",
+                },
+            )
+            tomato, _ = Crop.objects.get_or_create(name="Tomato", variety="BARI Tomato-15")
+            salma_planting, _ = CropPlanting.objects.update_or_create(
+                field=salma_field,
+                crop=tomato,
+                planting_date=date(2026, 9, 15),
+                defaults={
+                    "expected_harvest_date": date(2027, 1, 15),
+                    "status": CropPlanting.Status.GROWING,
+                    "notes": "Demonstration vegetable crop record.",
+                },
+            )
+            FarmActivity.objects.update_or_create(
+                farm=salma_farm,
+                field=salma_field,
+                activity_type=FarmActivity.ActivityType.OBSERVATION,
+                activity_date=date(2026, 11, 2),
+                defaults={
+                    "planting": salma_planting,
+                    "details": "Checked leaf condition, trellis ties, and soil moisture.",
+                },
+            )
+            FarmTask.objects.update_or_create(
+                farm=salma_farm,
+                title="Inspect tomato trellis and leaf health",
+                defaults={
+                    "field": salma_field,
+                    "due_date": timezone.localdate() + timedelta(days=1),
+                    "status": FarmTask.Status.IN_PROGRESS,
+                    "priority": FarmTask.Priority.HIGH,
+                    "notes": "Record any leaf curling and compare moisture at three points.",
+                },
+            )
+            FarmTask.objects.update_or_create(
+                farm=salma_farm,
+                title="Review drip irrigation schedule",
+                defaults={
+                    "field": salma_field,
+                    "due_date": timezone.localdate() + timedelta(days=4),
+                    "status": FarmTask.Status.PENDING,
+                    "priority": FarmTask.Priority.MEDIUM,
+                },
+            )
+
             scenario, _ = SimulationScenario.objects.update_or_create(
                 owner=farmer,
                 name="2019 rice comparison",
@@ -243,6 +364,22 @@ class Command(BaseCommand):
                 },
             )
             calculate_and_store(scenario)
+            salma_scenario, _ = SimulationScenario.objects.update_or_create(
+                owner=salma,
+                name="Tomato dry-week comparison",
+                defaults={
+                    "farm": salma_farm,
+                    "field": salma_field,
+                    "crop": tomato,
+                    "planting_date": date(2026, 9, 15),
+                    "temperature_assumption": Decimal("31.0"),
+                    "rainfall_assumption": Decimal("420.0"),
+                    "irrigation_scenario": SimulationScenario.IrrigationScenario.MODERATE,
+                    "historical_year": 2024,
+                    "season": SimulationScenario.Season.RABI,
+                },
+            )
+            calculate_and_store(salma_scenario)
             decision, _ = FarmingDecision.objects.update_or_create(
                 owner=farmer,
                 title="Use shorter irrigation cycles",
@@ -267,6 +404,30 @@ class Command(BaseCommand):
                     "yield_impact": "Not yet known",
                 },
             )
+            salma_decision, _ = FarmingDecision.objects.update_or_create(
+                owner=salma,
+                title="Adjust the tomato drip schedule",
+                decision_date=date(2026, 11, 3),
+                defaults={
+                    "farm": salma_farm,
+                    "field": salma_field,
+                    "planting": salma_planting,
+                    "simulation": salma_scenario,
+                    "decision_type": FarmingDecision.DecisionType.IRRIGATION,
+                    "details": "Use shorter morning drip cycles while checking moisture below the surface.",
+                    "rationale": "Demonstration decision based on a saved scenario and field observations.",
+                    "status": FarmingDecision.Status.REVIEWED,
+                },
+            )
+            DecisionOutcome.objects.update_or_create(
+                decision=salma_decision,
+                defaults={
+                    "observed_date": date(2026, 11, 5),
+                    "outcome": "Surface moisture remained even and no standing water was observed.",
+                    "rating": 4,
+                    "yield_impact": "Too early to assess",
+                },
+            )
 
             consultation, _ = Consultation.objects.update_or_create(
                 farmer=farmer,
@@ -279,7 +440,11 @@ class Command(BaseCommand):
                     "priority": Consultation.Priority.NORMAL,
                 },
             )
-            assign_consultation(consultation, assigned_by=admin_user, share_farm=True, consent_scope=FarmDataConsent.Scope.SUMMARY)
+            self._assign_demo_consultation(
+                consultation,
+                assigned_by=admin_user,
+                consent_scope=FarmDataConsent.Scope.SUMMARY,
+            )
             ConsultationMessage.objects.update_or_create(
                 consultation=consultation,
                 sender=farmer,
@@ -300,6 +465,42 @@ class Command(BaseCommand):
                     "status": ExpertRecommendation.Status.PUBLISHED,
                 },
             )
+            salma_consultation, _ = Consultation.objects.update_or_create(
+                farmer=salma,
+                title="Review tomato leaf curl and soil moisture",
+                defaults={
+                    "agriculturalist": soil_expert,
+                    "farm": salma_farm,
+                    "description": "Please review the demonstration plot notes and suggest safe checks before changing irrigation.",
+                    "status": Consultation.Status.ACTIVE,
+                    "priority": Consultation.Priority.HIGH,
+                },
+            )
+            self._assign_demo_consultation(
+                salma_consultation,
+                assigned_by=operations_admin,
+                consent_scope=FarmDataConsent.Scope.FULL,
+            )
+            ConsultationMessage.objects.update_or_create(
+                consultation=salma_consultation,
+                sender=salma,
+                body="A few upper leaves are curling after warmer afternoons. The soil surface also dries quickly.",
+            )
+            ConsultationMessage.objects.update_or_create(
+                consultation=salma_consultation,
+                sender=soil_expert,
+                body="Inspect the underside of leaves, compare root-zone moisture at several points, and avoid changing irrigation from surface appearance alone.",
+            )
+            ExpertRecommendation.objects.update_or_create(
+                consultation=salma_consultation,
+                agriculturalist=soil_expert,
+                title="Leaf and root-zone moisture inspection",
+                defaults={
+                    "explanation": "Record leaf symptoms, inspect for insects, and check moisture below the surface before adjusting drip duration. Seek an in-person diagnosis if symptoms spread.",
+                    "priority": ExpertRecommendation.Priority.HIGH,
+                    "status": ExpertRecommendation.Status.PUBLISHED,
+                },
+            )
 
             category, _ = LearningCategory.objects.get_or_create(
                 slug="water-management",
@@ -314,6 +515,27 @@ class Command(BaseCommand):
                     "title": "Check soil moisture before irrigation",
                     "summary": "A practical demonstration guide to inspecting moisture and avoiding unnecessary irrigation.",
                     "body": "Check moisture below the dry surface, compare several field points, and inspect drainage. Consider crop stage and verified local weather. Seek qualified local advice for high-risk decisions.",
+                    "language": LearningArticle.Language.ENGLISH,
+                    "status": LearningArticle.Status.PUBLISHED,
+                    "published_at": timezone.now(),
+                },
+            )
+            soil_category, _ = LearningCategory.objects.get_or_create(
+                slug="soil-and-vegetable-care",
+                defaults={
+                    "name": "Soil and Vegetable Care",
+                    "description": "Practical soil checks and vegetable crop observation guides.",
+                },
+            )
+            LearningArticle.objects.update_or_create(
+                slug="inspect-root-zone-moisture-not-only-the-surface",
+                defaults={
+                    "category": soil_category,
+                    "author": soil_expert,
+                    "reviewer": operations_admin,
+                    "title": "Inspect root-zone moisture, not only the surface",
+                    "summary": "A demonstration guide for comparing surface dryness with moisture near crop roots.",
+                    "body": "Check several points at root depth, note recent irrigation and rainfall, and record crop symptoms before changing a schedule. Verify important decisions with qualified local advice.",
                     "language": LearningArticle.Language.ENGLISH,
                     "status": LearningArticle.Status.PUBLISHED,
                     "published_at": timezone.now(),
@@ -379,9 +601,24 @@ class Command(BaseCommand):
                     "staff_response": "Open My Farm, choose the field, and select Edit field.",
                 },
             )
+            SupportTicket.objects.update_or_create(
+                user=salma,
+                subject="Where can I review expert recommendations?",
+                defaults={
+                    "name": salma.display_name,
+                    "email": salma.email,
+                    "message": "Second demonstration support ticket for the local admin workflow.",
+                    "status": SupportTicket.Status.OPEN,
+                    "priority": SupportTicket.Priority.NORMAL,
+                    "staff_response": "",
+                },
+            )
             self._notification(farmer, Notification.Kind.EXPERT_REPLIED, "Agriculturalist replied", "Your irrigation consultation has a new response.", f"/farmer/consultations/{consultation.pk}/")
             self._notification(expert, Notification.Kind.CONSULTATION_ASSIGNED, "Consultation assigned", "Rahim Mia shared a demonstration consultation.", f"/agriculturalist/questions/{consultation.pk}/")
             self._notification(admin_user, Notification.Kind.SYSTEM, "Demo data ready", "Local demonstration records were refreshed.", "/platform-admin/dashboard/")
+            self._notification(salma, Notification.Kind.EXPERT_REPLIED, "Soil expert replied", "Your tomato consultation has a new response.", f"/farmer/consultations/{salma_consultation.pk}/")
+            self._notification(soil_expert, Notification.Kind.CONSULTATION_ASSIGNED, "Consultation assigned", "Salma Begum shared a demonstration consultation.", f"/agriculturalist/questions/{salma_consultation.pk}/")
+            self._notification(operations_admin, Notification.Kind.SYSTEM, "Demo operations ready", "Additional local demonstration records were refreshed.", "/platform-admin/dashboard/")
             AuditLog.objects.get_or_create(
                 actor=admin_user,
                 action="demo.seed_refreshed",
@@ -391,10 +628,10 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS("Demo accounts and labeled sample data are ready."))
-        self.stdout.write("Admin: admin@farmtime.test")
-        self.stdout.write("Agriculturalist: agriculturalist@farmtime.test")
-        self.stdout.write("Farmer: farmer@farmtime.test")
-        self.stdout.write("All local demo accounts use the password documented in README. Never reuse it outside development.")
+        self.stdout.write("Admins: admin@farmtime.test, operations.admin@farmtime.test")
+        self.stdout.write("Agriculturalists: agriculturalist@farmtime.test, soil.expert@farmtime.test")
+        self.stdout.write("Farmers: farmer@farmtime.test, salma.farmer@farmtime.test")
+        self.stdout.write("All local demo accounts use the password documented in README_DEMO.md. Never reuse it outside development.")
 
     def _user(self, email, full_name, role, **extra):
         user, _ = User.objects.get_or_create(email=email, defaults={"full_name": full_name, "role": role})
@@ -409,6 +646,30 @@ class Command(BaseCommand):
         user.set_password(DEMO_PASSWORD)
         user.save()
         return user
+
+    def _assign_demo_consultation(self, consultation, *, assigned_by, consent_scope):
+        ExpertAssignment.objects.update_or_create(
+            consultation=consultation,
+            defaults={
+                "farmer": consultation.farmer,
+                "agriculturalist": consultation.agriculturalist,
+                "assigned_by": assigned_by,
+                "is_active": True,
+                "ended_at": None,
+            },
+        )
+        consent, _ = FarmDataConsent.objects.update_or_create(
+            consultation=consultation,
+            defaults={
+                "farmer": consultation.farmer,
+                "agriculturalist": consultation.agriculturalist,
+                "farm": consultation.farm,
+                "scope": consent_scope,
+                "revoked_at": None,
+            },
+        )
+        consent.full_clean()
+        consent.save()
 
     def _notification(self, user, kind, title, body, target_url):
         Notification.objects.get_or_create(

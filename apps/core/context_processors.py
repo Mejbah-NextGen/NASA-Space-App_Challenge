@@ -87,6 +87,7 @@ def platform_context(request):
     return {
         "platform_name": "Farm Time Machine",
         "demo_mode": settings.DEMO_MODE,
+        "email_verification_enabled": settings.EMAIL_VERIFICATION_ENABLED,
         "unread_notification_count": unread_count,
         "recent_notifications": recent_notifications,
         "public_ui": PUBLIC_UI_COPY[language_code],

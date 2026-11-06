@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -27,11 +28,16 @@ class SupportTicketFormTests(TestCase):
 
 @override_settings(WEATHER_LIVE_ENABLED=False, DEMO_MODE=True)
 class PublicPageSmokeTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_home_renders_public_weather_and_history(self):
         response = self.client.get(reverse("core:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Understand the Past")
         self.assertContains(response, "DEMONSTRATION DATA")
+        self.assertIn("default-src 'self'", response["Content-Security-Policy"])
+        self.assertEqual(response["Permissions-Policy"], "camera=(), geolocation=(), microphone=()")
 
     def test_help_creates_ticket(self):
         response = self.client.post(
@@ -44,6 +50,19 @@ class PublicPageSmokeTests(TestCase):
             },
         )
         self.assertRedirects(response, reverse("core:help"))
+
+    @override_settings(SUPPORT_RATE_LIMIT_PER_10_MINUTES=1)
+    def test_public_support_submission_is_rate_limited(self):
+        payload = {
+            "name": "Rahim",
+            "email": "rahim@example.com",
+            "subject": "Weather card",
+            "message": "The weather card has not updated since yesterday.",
+        }
+        self.assertEqual(self.client.post(reverse("core:help"), payload).status_code, 302)
+        blocked = self.client.post(reverse("core:help"), payload)
+        self.assertEqual(blocked.status_code, 429)
+        self.assertContains(blocked, "Too many support requests", status_code=429)
 
     def test_standard_language_switch_persists_bengali_public_copy(self):
         english = self.client.get(reverse("core:home"))

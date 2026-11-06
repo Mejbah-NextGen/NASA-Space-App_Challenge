@@ -75,9 +75,9 @@
             </div>
           </details>
           <details class="action-menu profile-menu">
-            <summary class="profile-summary"><span class="avatar">{% if user.profile_image %}<img src="{{ user.profile_image.url }}" alt="">{% else %}{{ user.display_name|slice:':1'|upper }}{% endif %}</span><span class="profile-copy"><strong>{{ user.display_name }}</strong><small>{{ user.district|default:user.get_role_display }}</small></span><i data-lucide="chevron-down"></i></summary>
+            <summary class="profile-summary"><span class="avatar">{% if user.profile_image %}<img src="{% url 'accounts:profile_image' %}" alt="">{% else %}{{ user.display_name|slice:':1'|upper }}{% endif %}</span><span class="profile-copy"><strong>{{ user.display_name }}</strong><small>{{ user.district|default:user.get_role_display }}</small></span><i data-lucide="chevron-down"></i></summary>
             <div class="dropdown-panel profile-panel">
-              <div class="profile-panel-head"><span class="avatar">{{ user.display_name|slice:':1'|upper }}</span><span><strong>{{ user.display_name }}</strong><small>{{ user.get_role_display }} · {% if user.is_verified %}Verified{% else %}Verification pending{% endif %}</small></span></div>
+              <div class="profile-panel-head"><span class="avatar">{{ user.display_name|slice:':1'|upper }}</span><span><strong>{{ user.display_name }}</strong><small>{{ user.get_role_display }}{% if email_verification_enabled %} · {% if user.is_verified %}Email verified{% else %}Email verification pending{% endif %}{% endif %}</small></span></div>
               <a href="{% url 'accounts:profile' %}"><i data-lucide="user"></i><span>My Profile<small>Account and role information</small></span></a>
               <a href="{% url 'accounts:settings' %}"><i data-lucide="settings"></i><span>Account Settings<small>Language and alerts</small></span></a>
               <a href="{% url 'accounts:password_change' %}"><i data-lucide="shield-check"></i><span>Security<small>Change your password</small></span></a>
@@ -89,7 +89,7 @@
       </header>
 
       {% if messages %}<div class="workspace-messages" aria-live="polite">{% for message in messages %}<div class="app-alert app-alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}</div>{% endif %}
-      {% if not user.is_verified %}<div class="verification-banner"><i data-lucide="badge-alert"></i><span><strong>Email verification pending.</strong> Some trusted actions may remain unavailable until you verify your address.</span></div>{% endif %}
+      {% if email_verification_enabled and not user.is_verified %}<div class="verification-banner"><i data-lucide="badge-alert"></i><span><strong>Email verification pending.</strong> Some trusted actions may remain unavailable until you verify your address.</span></div>{% endif %}
       <main class="workspace-content" id="workspace-content">{% block content %}{% endblock %}</main>
     </div>
   </div>

@@ -9,7 +9,11 @@ from .models import LearningArticle, LearningCategory
 class LearningArticleTests(TestCase):
     def setUp(self):
         self.expert = User.objects.create_user(
-            email="writer@example.test", password="StrongPass123!", full_name="Expert Writer", role=User.Role.AGRICULTURALIST
+            email="writer@example.test",
+            password="StrongPass123!",
+            full_name="Expert Writer",
+            role=User.Role.AGRICULTURALIST,
+            is_verified=True,
         )
         self.expert.agriculturalist_profile.is_approved = True
         self.expert.agriculturalist_profile.save(update_fields=["is_approved"])

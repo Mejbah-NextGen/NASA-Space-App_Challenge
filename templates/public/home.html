@@ -74,7 +74,6 @@
 {{ history_chart|json_script:"home-history-data" }}
 {% endblock %}
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 (() => { const node = document.getElementById('home-history-data'); const canvas = document.getElementById('homeRainfallChart'); if (!node || !canvas || !window.Chart) return; const d = JSON.parse(node.textContent); new Chart(canvas, {type:'bar',data:{labels:d.years,datasets:[{label:'Rainfall (mm)',data:d.rainfall,backgroundColor:'#20734D',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'mm'}},x:{grid:{display:false}}}}}); })();
 </script>

@@ -60,7 +60,7 @@ Navigation is adjusted for usability, but hidden links are never treated as auth
 - Admin cannot suspend the current Admin session through the custom action.
 - Demo accounts are accepted only in explicit development mode.
 - Password changes use Django’s secure flow and retain the signed-in session appropriately.
-- Password-reset and verification links are time-limited/signed.
+- Password-reset links are time-limited and signed. Signup verification links use the same protection when `EMAIL_VERIFICATION_ENABLED=true`; the feature is temporarily disabled by default.
 - Uploaded images and CSVs have limits and validation.
 - Report cells beginning with spreadsheet formula characters are escaped.
 - Audit metadata excludes recognized secret keys.

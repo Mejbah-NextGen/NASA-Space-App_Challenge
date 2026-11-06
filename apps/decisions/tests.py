@@ -27,3 +27,23 @@ class DecisionPrivacyTests(TestCase):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(reverse("decisions:detail", args=[self.decision.pk])).status_code, 404)
 
+    def test_owner_can_record_a_decision_through_the_workflow(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("decisions:create"),
+            {
+                "farm": self.decision.farm_id,
+                "field": "",
+                "planting": "",
+                "simulation": "",
+                "decision_type": FarmingDecision.DecisionType.IRRIGATION,
+                "title": "Use a shorter irrigation cycle",
+                "decision_date": "2026-11-06",
+                "details": "Inspect moisture first, then use a shorter cycle.",
+                "rationale": "Avoid standing water after recent rain.",
+                "status": FarmingDecision.Status.PLANNED,
+            },
+        )
+        saved = FarmingDecision.objects.get(owner=self.owner, title="Use a shorter irrigation cycle")
+        self.assertRedirects(response, reverse("decisions:detail", args=[saved.pk]))
+

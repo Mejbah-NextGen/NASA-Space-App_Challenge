@@ -1,3 +1,6 @@
+import mimetypes
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
@@ -6,7 +9,7 @@ from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired
-from django.http import HttpResponseNotAllowed
+from django.http import FileResponse, Http404, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import activate
@@ -16,6 +19,7 @@ from django.views.generic import FormView, UpdateView
 from .forms import AccountSettingsForm, EmailAuthenticationForm, ProfileForm, SignUpForm
 from .models import AgriculturalistVerification, User
 from .tokens import create_verification_token, read_verification_token
+from .verification import email_verification_enabled, user_has_verified_email
 
 
 def _client_address(request):
@@ -40,6 +44,8 @@ def _record_failed_login(rate_key):
 
 
 def _send_verification_email(request, user):
+    if not email_verification_enabled():
+        return
     token = create_verification_token(user)
     link = request.build_absolute_uri(reverse("accounts:verify_email", args=[token]))
     send_mail(
@@ -58,7 +64,11 @@ class AccountLoginView(LoginView):
 
     def dispatch(self, request, *args, **kwargs):
         self.rate_key = f"login:{_client_address(request)}"
-        if request.method == "POST" and cache.get(self.rate_key, 0) >= 10:
+        if request.method == "POST" and cache.get(self.rate_key, 0) >= settings.LOGIN_RATE_LIMIT:
+            from apps.administration.models import AuditLog
+            from apps.administration.services import record_audit
+
+            record_audit(request, "auth.login_rate_limited", result=AuditLog.Result.DENIED)
             return render(request, self.template_name, {"rate_limited": True}, status=429)
         return super().dispatch(request, *args, **kwargs)
 
@@ -68,6 +78,9 @@ class AccountLoginView(LoginView):
 
     def form_valid(self, form):
         cache.delete(self.rate_key)
+        from apps.administration.services import record_audit
+
+        record_audit(self.request, "auth.login_succeeded", form.get_user())
         return super().form_valid(form)
 
 
@@ -77,15 +90,22 @@ class SignUpView(FormView):
     success_url = reverse_lazy("accounts:login")
 
     def form_valid(self, form):
+        form.instance.is_verified = not email_verification_enabled()
         user = form.save()
         if user.role == User.Role.AGRICULTURALIST:
             AgriculturalistVerification.objects.create(agriculturalist=user.agriculturalist_profile)
-        _send_verification_email(self.request, user)
-        messages.success(self.request, "Account created. Check your email for the verification link.")
+        if email_verification_enabled():
+            _send_verification_email(self.request, user)
+            messages.success(self.request, "Account created. Check your email for the verification link.")
+        else:
+            messages.success(self.request, "Account created. You can sign in now.")
         return super().form_valid(form)
 
 
 def verify_email(request, token):
+    if not email_verification_enabled():
+        messages.info(request, "Email verification is not currently required. You can sign in now.")
+        return redirect("accounts:login")
     try:
         data = read_verification_token(token, settings.EMAIL_VERIFICATION_MAX_AGE)
     except SignatureExpired:
@@ -104,7 +124,7 @@ def verify_email(request, token):
 def post_login_redirect(request):
     if not request.user.is_authenticated:
         return redirect("accounts:login")
-    if request.user.role == User.Role.FARMER and not request.user.is_verified:
+    if request.user.role == User.Role.FARMER and not user_has_verified_email(request.user):
         messages.warning(request, "Verify your email address before opening the Farmer workspace.")
         return redirect("accounts:profile")
     destination = {
@@ -130,16 +150,48 @@ class ProfileView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form):
         email_changed = self.previous_email.casefold() != form.cleaned_data["email"].casefold()
         if email_changed:
-            form.instance.is_verified = False
+            form.instance.is_verified = not email_verification_enabled()
         response = super().form_valid(form)
         if email_changed:
-            _send_verification_email(self.request, self.object)
-            messages.warning(
+            from apps.administration.services import record_audit
+
+            record_audit(
                 self.request,
-                "Your email address changed. Verify the new address before returning to the Farmer workspace.",
+                "account.email_changed",
+                self.object,
+                metadata={"previous_email": self.previous_email, "new_email": self.object.email},
             )
+            if email_verification_enabled():
+                _send_verification_email(self.request, self.object)
+                messages.warning(
+                    self.request,
+                    "Your email address changed. Verify the new address before returning to your workspace.",
+                )
+            else:
+                messages.success(self.request, "Your profile and email address have been updated.")
         else:
             messages.success(self.request, "Your profile has been updated.")
+        return response
+
+
+class ProfileImageView(LoginRequiredMixin, View):
+    def get(self, request):
+        image = request.user.profile_image
+        if not image:
+            raise Http404("No profile image is available.")
+        try:
+            stream = image.storage.open(image.name, "rb")
+        except (FileNotFoundError, OSError) as exc:
+            raise Http404("The profile image is unavailable.") from exc
+        content_type = mimetypes.guess_type(image.name)[0] or "application/octet-stream"
+        response = FileResponse(
+            stream,
+            as_attachment=False,
+            filename=Path(image.name).name,
+            content_type=content_type,
+        )
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
 
@@ -173,8 +225,12 @@ class AccountPasswordChangeView(PasswordChangeView):
     success_url = reverse_lazy("accounts:settings")
 
     def form_valid(self, form):
+        from apps.administration.services import record_audit
+
+        response = super().form_valid(form)
+        record_audit(self.request, "account.password_changed", self.request.user)
         messages.success(self.request, "Your password has been changed securely.")
-        return super().form_valid(form)
+        return response
 
 
 class SecureLogoutView(LoginRequiredMixin, View):
@@ -182,6 +238,9 @@ class SecureLogoutView(LoginRequiredMixin, View):
         return HttpResponseNotAllowed(["POST"])
 
     def post(self, request, *args, **kwargs):
+        from apps.administration.services import record_audit
+
+        record_audit(request, "auth.logout", request.user)
         logout(request)
         messages.success(request, "You have been signed out.")
         return redirect("core:home")

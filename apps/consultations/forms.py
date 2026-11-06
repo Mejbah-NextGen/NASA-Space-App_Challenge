@@ -1,6 +1,7 @@
 from django import forms
 
 from apps.accounts.models import User
+from apps.accounts.verification import restrict_to_email_verified
 from apps.farms.models import Crop, Farm
 from apps.simulations.models import SimulationScenario
 
@@ -22,12 +23,14 @@ class ConsultationCreateForm(forms.ModelForm):
     def __init__(self, *args, farmer=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.farmer = farmer
-        self.fields["agriculturalist"].queryset = User.objects.filter(
+        experts = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
             is_active=True,
-            is_verified=True,
             agriculturalist_profile__is_approved=True,
-        ).select_related("agriculturalist_profile")
+        )
+        self.fields["agriculturalist"].queryset = restrict_to_email_verified(experts).select_related(
+            "agriculturalist_profile"
+        )
         self.fields["agriculturalist"].required = False
         self.fields["farm"].queryset = Farm.objects.filter(owner=farmer, is_archived=False) if farmer else Farm.objects.none()
 

@@ -5,8 +5,25 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *  # noqa: F403
 
 
-if SECRET_KEY == "unsafe-development-key-change-me":  # noqa: F405
-    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured in production")
+if (  # noqa: F405
+    SECRET_KEY == "unsafe-development-key-change-me"
+    or SECRET_KEY.lower().startswith(("replace-", "generate-"))
+    or len(SECRET_KEY) < 50
+):
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be a unique production secret of at least 50 characters")
+if DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":  # noqa: F405
+    raise ImproperlyConfigured("DATABASE_URL must configure PostgreSQL in production")
+if EMAIL_BACKEND in {  # noqa: F405
+    "django.core.mail.backends.console.EmailBackend",
+    "django.core.mail.backends.dummy.EmailBackend",
+}:
+    raise ImproperlyConfigured("Configure a real EMAIL_BACKEND in production")
+if CACHES["default"]["BACKEND"] in {  # noqa: F405
+    "django.core.cache.backends.locmem.LocMemCache",
+    "django.core.cache.backends.dummy.DummyCache",
+    "django.core.cache.backends.filebased.FileBasedCache",
+}:
+    raise ImproperlyConfigured("Configure a shared atomic cache backend in production")
 DEBUG = False
 DEMO_MODE = False
 MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa: F405

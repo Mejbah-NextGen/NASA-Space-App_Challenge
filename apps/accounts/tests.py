@@ -2,18 +2,38 @@ import os
 import re
 import subprocess
 import sys
+from io import BytesIO
 from unittest.mock import patch
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core import mail
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from PIL import Image
 
-from .models import AgriculturalistProfile, User
+from apps.administration.models import AuditLog
+
+from .models import AgriculturalistProfile, AgriculturalistVerification, User
 from .tokens import create_verification_token
+from .validators import validate_profile_image
 from .views import _client_address, _record_failed_login
+
+
+class ImageUploadValidationTests(SimpleTestCase):
+    def test_rejects_renamed_non_image_content(self):
+        upload = SimpleUploadedFile("fake.png", b"<script>alert(1)</script>", content_type="image/png")
+        with self.assertRaises(ValidationError):
+            validate_profile_image(upload)
+
+    def test_accepts_a_small_valid_png(self):
+        payload = BytesIO()
+        Image.new("RGB", (4, 4), "green").save(payload, format="PNG")
+        upload = SimpleUploadedFile("avatar.png", payload.getvalue(), content_type="image/png")
+        validate_profile_image(upload)
 
 
 class AuthenticationWorkflowTests(TestCase):
@@ -30,7 +50,8 @@ class AuthenticationWorkflowTests(TestCase):
             **extra,
         )
 
-    def test_farmer_registration_is_email_based_and_sends_verification(self):
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_farmer_registration_creates_immediately_usable_account(self):
         response = self.client.post(
             reverse("accounts:signup"),
             {
@@ -51,8 +72,37 @@ class AuthenticationWorkflowTests(TestCase):
         account = User.objects.get(email="new@example.com")
         self.assertEqual(account.role, User.Role.FARMER)
         self.assertFalse(account.is_staff)
+        self.assertTrue(account.is_verified)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(self.client.login(username=account.email, password="StrongLocalPass@2026"))
+        self.assertRedirects(
+            self.client.get(reverse("accounts:post_login")),
+            reverse("dashboard:farmer_dashboard"),
+        )
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    def test_farmer_registration_keeps_verification_flow_ready_for_reenable(self):
+        response = self.client.post(
+            reverse("accounts:signup"),
+            {
+                "account_type": User.Role.FARMER,
+                "full_name": "Future Verification Farmer",
+                "email": "future-verification@example.com",
+                "phone_number": "",
+                "district": "Dhaka",
+                "upazila": "",
+                "specialization": "",
+                "qualifications": "",
+                "password1": "StrongLocalPass@2026",
+                "password2": "StrongLocalPass@2026",
+                "agree_terms": "on",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:login"))
+        account = User.objects.get(email="future-verification@example.com")
         self.assertFalse(account.is_verified)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [account.email])
 
     def test_successful_email_login_creates_session_and_redirects_by_role(self):
         user = self.make_user("login@example.com", User.Role.FARMER)
@@ -63,11 +113,23 @@ class AuthenticationWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("accounts:post_login"))
         self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+        self.assertTrue(AuditLog.objects.filter(action="auth.login_succeeded", target_identifier=str(user.pk)).exists())
         role_redirect = self.client.get(response.url)
         self.assertRedirects(role_redirect, reverse("dashboard:farmer_dashboard"))
 
-    def test_unverified_farmer_cannot_open_workspace(self):
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_legacy_unverified_farmer_can_open_workspace_while_feature_is_disabled(self):
         user = self.make_user("pending-farmer@example.com", User.Role.FARMER, is_verified=False)
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("dashboard:farmer_dashboard")).status_code, 200)
+        self.assertRedirects(
+            self.client.get(reverse("accounts:post_login")),
+            reverse("dashboard:farmer_dashboard"),
+        )
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    def test_unverified_farmer_is_blocked_when_feature_is_reenabled(self):
+        user = self.make_user("verification-required@example.com", User.Role.FARMER, is_verified=False)
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("dashboard:farmer_dashboard")).status_code, 403)
         self.assertRedirects(
@@ -102,6 +164,7 @@ class AuthenticationWorkflowTests(TestCase):
         self.assertRedirects(completed, reverse("accounts:password_reset_complete"))
         self.assertTrue(self.client.login(username=user.email, password=new_password))
 
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
     def test_verification_token_marks_email_verified(self):
         user = self.make_user("verify@example.com", User.Role.FARMER, is_verified=False)
         response = self.client.get(reverse("accounts:verify_email", args=[create_verification_token(user)]))
@@ -150,7 +213,8 @@ class AuthenticationWorkflowTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.role, User.Role.FARMER)
 
-    def test_changing_verified_email_starts_new_verification_cycle(self):
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    def test_changing_verified_email_starts_new_verification_cycle_when_enabled(self):
         user = self.make_user("verified@example.com", User.Role.FARMER, is_verified=True)
         self.client.force_login(user)
         response = self.client.post(
@@ -170,12 +234,35 @@ class AuthenticationWorkflowTests(TestCase):
         self.assertFalse(user.is_verified)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["new-address@example.com"])
+        self.assertTrue(AuditLog.objects.filter(action="account.email_changed", target_identifier=str(user.pk)).exists())
 
         match = re.search(r"https?://[^\s]+(?P<path>/accounts/verify/[^\s]+/)", mail.outbox[0].body)
         self.assertIsNotNone(match)
         self.client.get(urlparse(match.group(0)).path)
         user.refresh_from_db()
         self.assertTrue(user.is_verified)
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_changing_email_does_not_send_or_block_when_verification_is_disabled(self):
+        user = self.make_user("legacy-unverified@example.com", User.Role.FARMER, is_verified=False)
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("accounts:profile"),
+            {
+                "full_name": user.full_name,
+                "email": "UPDATED@Example.com",
+                "phone_number": "",
+                "district": "Dhaka",
+                "upazila": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+        user.refresh_from_db()
+        self.assertEqual(user.email, "updated@example.com")
+        self.assertTrue(user.is_verified)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(AuditLog.objects.filter(action="account.email_changed", target_identifier=str(user.pk)).exists())
 
     def test_profile_update_with_same_email_preserves_verification(self):
         user = self.make_user("same@example.com", User.Role.FARMER, is_verified=True)
@@ -197,6 +284,39 @@ class AuthenticationWorkflowTests(TestCase):
     def test_pending_agriculturalist_cannot_open_expert_dashboard(self):
         user = self.make_user("pending@example.com", User.Role.AGRICULTURALIST)
         self.assertFalse(AgriculturalistProfile.objects.get(user=user).is_approved)
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 403)
+
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_agriculturalist_signup_bypasses_email_but_still_requires_professional_approval(self):
+        response = self.client.post(
+            reverse("accounts:signup"),
+            {
+                "account_type": User.Role.AGRICULTURALIST,
+                "full_name": "New Agriculturalist",
+                "email": "new-expert@example.com",
+                "phone_number": "",
+                "district": "Dhaka",
+                "upazila": "",
+                "specialization": "Soil health",
+                "qualifications": "BSc in Agriculture",
+                "password1": "StrongLocalPass@2026",
+                "password2": "StrongLocalPass@2026",
+                "agree_terms": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("accounts:login"))
+        user = User.objects.get(email="new-expert@example.com")
+        self.assertTrue(user.is_verified)
+        self.assertFalse(user.agriculturalist_profile.is_approved)
+        self.assertTrue(
+            AgriculturalistVerification.objects.filter(
+                agriculturalist=user.agriculturalist_profile,
+                status=AgriculturalistVerification.Status.PENDING,
+            ).exists()
+        )
+        self.assertEqual(len(mail.outbox), 0)
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 403)
 
@@ -247,14 +367,32 @@ class AuthenticationWorkflowTests(TestCase):
         self.assertEqual(public_page.wsgi_request.LANGUAGE_CODE, "bn")
         self.assertContains(public_page, "অতীতকে বুঝুন।")
 
+    def test_profile_image_uses_an_authenticated_self_only_endpoint(self):
+        user = self.make_user("avatar@example.com", User.Role.FARMER)
+        user.profile_image = "profiles/2026/11/avatar.png"
+        user.save(update_fields=["profile_image"])
+
+        anonymous = self.client.get(reverse("accounts:profile_image"))
+        self.assertEqual(anonymous.status_code, 302)
+        self.client.force_login(user)
+        dashboard = self.client.get(reverse("dashboard:farmer_dashboard"))
+        self.assertContains(dashboard, reverse("accounts:profile_image"))
+        self.assertNotContains(dashboard, "/media/profiles/2026/11/avatar.png")
+        missing_file = self.client.get(reverse("accounts:profile_image"))
+        self.assertEqual(missing_file.status_code, 404)
+
 
 class ProductionProxySettingsTests(SimpleTestCase):
     def _run_settings_assertion(self, flag, assertion):
         environment = os.environ.copy()
         environment.update(
             {
-                "DJANGO_SECRET_KEY": "proxy-test-only-7J!q2W@r9L#p4N$x8C%v6B&k3Z*e5T",
+                "DJANGO_SECRET_KEY": "proxy-test-only-0123456789abcdefghijklmnopqrstuvwxyz-ABCDE",
                 "ALLOWED_HOSTS": "example.com",
+                "DATABASE_URL": "postgresql://check:check@127.0.0.1:5432/check",
+                "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+                "CACHE_BACKEND": "django.core.cache.backends.redis.RedisCache",
+                "CACHE_LOCATION": "redis://127.0.0.1:6379/15",
                 "TRUST_X_FORWARDED_PROTO": flag,
             }
         )

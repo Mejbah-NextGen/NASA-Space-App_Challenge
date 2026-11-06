@@ -180,8 +180,6 @@ class AgriculturalistReviewView(PlatformAdminRequiredMixin, DetailView):
         profile.is_approved = approved
         profile.approved_at = timezone.now() if approved else None
         profile.save(update_fields=["is_approved", "approved_at"])
-        profile.user.is_verified = approved
-        profile.user.save(update_fields=["is_verified"])
         record_audit(request, f"expert.{verification.status.lower()}", profile.user)
         messages.success(request, "The professional verification decision was recorded.")
         return redirect("administration:agriculturalists")
