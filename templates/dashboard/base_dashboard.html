@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Farm Time Machine secure workspace">
+  <meta name="description" content="Farm Time Machine collaboration workspace">
   <title>{% block title %}Dashboard{% endblock %} · Farm Time Machine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
 <body class="workspace-body">
   <a class="skip-link" href="#workspace-content">Skip to main content</a>
   <div class="workspace-shell">
-    <aside class="workspace-sidebar" aria-label="Workspace navigation">
+    <aside class="workspace-sidebar" id="workspace-navigation" data-workspace-navigation aria-label="Workspace navigation">
       <a class="sidebar-brand" href="{% url 'accounts:post_login' %}"><span class="brand-mark">FT</span><span>Farm Time<br><strong>Machine</strong><small>{{ user.get_role_display }}</small></span></a>
       <nav class="sidebar-nav">
         {% if user.role == 'FARMER' %}
@@ -27,9 +27,6 @@
           <a href="{% url 'decisions:list' %}" data-path="/farmer/decisions/"><i data-lucide="notebook-tabs"></i>Past Decisions</a>
           <a href="{% url 'farmer_consultations:list' %}" data-path="/farmer/consultations/"><i data-lucide="messages-square"></i>Ask an Expert</a>
           <a href="{% url 'weather:farmer_weather' %}" data-path="/farmer/weather/"><i data-lucide="cloud-sun"></i>Weather &amp; Alerts</a>
-          <a href="{% url 'dashboard:farmer_learning' %}" data-path="/farmer/learning/"><i data-lucide="book-open"></i>Learning Center</a>
-          <a href="{% url 'dashboard:farmer_support' %}" data-path="/farmer/support/"><i data-lucide="circle-help"></i>Help &amp; Support</a>
-          <a href="{% url 'dashboard:farmer_data_sources' %}" data-path="/farmer/data-sources/"><i data-lucide="database"></i>Data Sources</a>
         {% elif user.role == 'AGRICULTURALIST' %}
           <a href="{% url 'dashboard:agriculturalist_dashboard' %}" data-path="/agriculturalist/dashboard/"><i data-lucide="layout-dashboard"></i>Dashboard</a>
           <a href="{% url 'agriculturalist:assigned_farmers' %}"><i data-lucide="users"></i>Assigned Farmers</a>
@@ -39,8 +36,6 @@
           <a href="{% url 'agriculturalist:recommendations' %}"><i data-lucide="clipboard-check"></i>Expert Recommendations</a>
           <a href="{% url 'agriculturalist:questions' %}"><i data-lucide="messages-square"></i>Farmer Questions</a>
           <a href="{% url 'agriculturalist:weather' %}"><i data-lucide="cloud-sun"></i>Weather &amp; Alerts</a>
-          <a href="{% url 'agriculturalist:learning' %}"><i data-lucide="book-open"></i>Learning Resources</a>
-          <a href="{% url 'agriculturalist:support' %}"><i data-lucide="circle-help"></i>Help &amp; Support</a>
         {% elif user.role == 'ADMIN' %}
           <a href="{% url 'administration:dashboard' %}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
           <a href="{% url 'administration:users' %}"><i data-lucide="users"></i>User Management</a>
@@ -58,31 +53,31 @@
         {% endif %}
       </nav>
       <form action="{% url 'accounts:logout' %}" method="post" class="sidebar-logout">
-        {% csrf_token %}<button type="submit"><i data-lucide="log-out"></i><span>Logout<small>End your secure session</small></span></button>
+        {% csrf_token %}<button type="submit"><i data-lucide="log-out"></i><span>Logout<small>Sign out of this account</small></span></button>
       </form>
     </aside>
 
     <div class="workspace-main">
       <header class="workspace-topbar">
-        <div><span class="mobile-brand">FT</span><span class="topbar-eyebrow">{{ user.get_role_display }} workspace</span><strong>{% block page_title %}Dashboard{% endblock %}</strong></div>
+        <div><button class="mobile-brand workspace-nav-toggle" type="button" data-workspace-nav-toggle aria-controls="workspace-navigation" aria-expanded="false"><span aria-hidden="true">FT</span><span class="visually-hidden">Open workspace menu</span></button><span class="topbar-eyebrow">{{ user.get_role_display }} workspace</span><strong>{% block page_title %}Dashboard{% endblock %}</strong></div>
         <div class="topbar-actions">
-          <button class="topbar-button ai-trigger" type="button" data-ai-open><i data-lucide="sparkles"></i><span>AI Assistant</span></button>
+          <button class="topbar-button ai-trigger" type="button" data-ai-open aria-controls="ai-farm-assistant" aria-expanded="false" aria-label="Open AI Farm Assistant"><i data-lucide="sparkles"></i><span>AI Assistant</span></button>
           <details class="action-menu notification-menu">
             <summary class="icon-button" aria-label="Notifications"><i data-lucide="bell"></i>{% if unread_notification_count %}<span class="notification-count">{{ unread_notification_count }}</span>{% endif %}</summary>
             <div class="dropdown-panel notification-panel">
               <div class="dropdown-heading"><strong>Notifications</strong><a href="{% url 'notifications:list' %}">View all</a></div>
-              {% for notification in recent_notifications %}<a href="{{ notification.target_url|default:'#' }}"><strong>{{ notification.title }}</strong><small>{{ notification.created_at|timesince }} ago</small></a>{% empty %}<p class="empty-inline">You are all caught up.</p>{% endfor %}
+              {% for notification in recent_notifications %}<a href="{% if notification.target_url %}{{ notification.target_url }}{% else %}{% url 'notifications:list' %}{% endif %}"><strong>{{ notification.title }}</strong><small>{{ notification.created_at|timesince }} ago</small></a>{% empty %}<p class="empty-inline">You are all caught up.</p>{% endfor %}
             </div>
           </details>
           <details class="action-menu profile-menu">
-            <summary class="profile-summary"><span class="avatar">{% if user.profile_image %}<img src="{% url 'accounts:profile_image' %}" alt="">{% else %}{{ user.display_name|slice:':1'|upper }}{% endif %}</span><span class="profile-copy"><strong>{{ user.display_name }}</strong><small>{{ user.district|default:user.get_role_display }}</small></span><i data-lucide="chevron-down"></i></summary>
+            <summary class="profile-summary" aria-label="Open profile menu"><span class="avatar">{% if user.profile_image %}<img src="{% url 'accounts:profile_image' %}" alt="">{% else %}{{ user.display_name|slice:':1'|upper }}{% endif %}</span><span class="profile-copy"><strong>{{ user.display_name }}</strong><small>{{ user.district|default:user.get_role_display }}</small></span><i data-lucide="chevron-down"></i></summary>
             <div class="dropdown-panel profile-panel">
-              <div class="profile-panel-head"><span class="avatar">{{ user.display_name|slice:':1'|upper }}</span><span><strong>{{ user.display_name }}</strong><small>{{ user.get_role_display }}{% if email_verification_enabled %} · {% if user.is_verified %}Email verified{% else %}Email verification pending{% endif %}{% endif %}</small></span></div>
-              <a href="{% url 'accounts:profile' %}"><i data-lucide="user"></i><span>My Profile<small>Account and role information</small></span></a>
+              <div class="profile-panel-head"><span class="avatar">{% if user.profile_image %}<img src="{% url 'accounts:profile_image' %}" alt="">{% else %}{{ user.display_name|slice:':1'|upper }}{% endif %}</span><span><strong>{{ user.display_name }}</strong><small>{{ user.get_role_display }} account</small></span></div>
+              <a href="{% url 'accounts:profile' %}"><i data-lucide="user"></i><span>My Profile<small>Contact and professional details</small></span></a>
               <a href="{% url 'accounts:settings' %}"><i data-lucide="settings"></i><span>Account Settings<small>Language and alerts</small></span></a>
-              <a href="{% url 'accounts:password_change' %}"><i data-lucide="shield-check"></i><span>Security<small>Change your password</small></span></a>
+              <a href="{% url 'accounts:password_change' %}"><i data-lucide="key-round"></i><span>Password<small>Update your sign-in password</small></span></a>
               <a href="{% url 'notifications:list' %}"><i data-lucide="bell"></i><span>Notifications<small>Preferences and history</small></span></a>
-              <form action="{% url 'accounts:logout' %}" method="post">{% csrf_token %}<button type="submit"><i data-lucide="log-out"></i><span>Logout<small>End this secure session</small></span></button></form>
+              <form action="{% url 'accounts:logout' %}" method="post">{% csrf_token %}<button type="submit"><i data-lucide="log-out"></i><span>Logout<small>Sign out of this account</small></span></button></form>
             </div>
           </details>
         </div>
@@ -92,17 +87,18 @@
       {% if email_verification_enabled and not user.is_verified %}<div class="verification-banner"><i data-lucide="badge-alert"></i><span><strong>Email verification pending.</strong> Some trusted actions may remain unavailable until you verify your address.</span></div>{% endif %}
       <main class="workspace-content" id="workspace-content">{% block content %}{% endblock %}</main>
     </div>
+    <div class="workspace-nav-backdrop" data-workspace-nav-backdrop hidden></div>
   </div>
 
   <nav class="mobile-bottom-nav" aria-label="Mobile shortcuts">
     <a href="{% url 'accounts:post_login' %}"><i data-lucide="house"></i>Home</a>
     <a href="{% url 'notifications:list' %}"><i data-lucide="bell"></i>Alerts</a>
     {% if user.role == 'FARMER' %}<a href="{% url 'farms:farm_list' %}"><i data-lucide="sprout"></i>Farm</a>{% else %}<a href="{% url 'accounts:profile' %}"><i data-lucide="user"></i>Profile</a>{% endif %}
-    <button type="button" data-scroll-features><i data-lucide="grid-2x2"></i>Menu</button>
+    <button type="button" data-workspace-nav-toggle aria-controls="workspace-navigation" aria-expanded="false"><i data-lucide="grid-2x2"></i>Menu</button>
   </nav>
 
   <div class="drawer-backdrop" data-ai-backdrop hidden></div>
-  <aside class="ai-drawer" data-ai-drawer aria-hidden="true" aria-label="AI Farm Assistant">
+  <aside class="ai-drawer" id="ai-farm-assistant" data-ai-drawer aria-hidden="true" aria-label="AI Farm Assistant" inert>
     <header><div><span class="status-dot"></span><strong>AI Farm Assistant</strong><small>Decision support with transparent limits</small></div><button class="icon-button" type="button" data-ai-close aria-label="Close assistant"><i data-lucide="x"></i></button></header>
     <div class="ai-disclosure"><i data-lucide="info"></i>This assistant does not replace a qualified Agriculturalist. Verify critical decisions locally.</div>
     <div class="suggestion-chips" data-ai-suggestions>
@@ -110,7 +106,7 @@
     </div>
     <div class="ai-messages" data-ai-messages><div class="ai-message assistant">Ask about rainfall, planting plans, irrigation, or soil practices. If no AI provider is configured, I’ll use the built-in guidance library and say so clearly.</div></div>
     <form class="ai-form" data-ai-form data-endpoint="{% url 'ai_assistant:chat' %}">{% csrf_token %}<label class="visually-hidden" for="ai-message">Ask a question</label><textarea id="ai-message" name="message" rows="2" maxlength="1000" placeholder="Ask a farming question…" required></textarea><button class="btn btn-brand" type="submit" aria-label="Send"><i data-lucide="send"></i></button></form>
-    <a class="ask-expert-link" href="{% if user.role == 'FARMER' %}{% url 'farmer_consultations:list' %}{% else %}{% url 'core:help' %}{% endif %}"><i data-lucide="users"></i>Ask a verified expert instead</a>
+    <a class="ask-expert-link" href="{% if user.role == 'FARMER' %}{% url 'farmer_consultations:list' %}{% else %}{% url 'core:help' %}{% endif %}"><i data-lucide="users"></i>Ask an agriculturalist instead</a>
   </aside>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>

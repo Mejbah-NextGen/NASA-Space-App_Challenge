@@ -387,9 +387,13 @@ class AssignmentActionView(PlatformAdminRequiredMixin, View):
 
         form = ExpertAssignmentForm(request.POST)
         if not form.is_valid():
-            messages.error(request, "Select an active consultation and approved Agriculturalist.")
+            messages.error(request, "Select an active consultation and Agriculturalist.")
             return redirect("administration:assignments")
-        consultation = form.cleaned_data["consultation"]
+        consultation = get_object_or_404(
+            Consultation.objects.select_for_update(),
+            pk=form.cleaned_data["consultation"].pk,
+            status__in=[Consultation.Status.PENDING, Consultation.Status.ASSIGNED, Consultation.Status.ACTIVE],
+        )
         expert = form.cleaned_data["agriculturalist"]
         previous_expert_id = consultation.agriculturalist_id
         existing_assignment = ExpertAssignment.objects.filter(consultation=consultation, is_active=True).first()

@@ -4,7 +4,7 @@
 
 - `accounts.User`: unique email login, role, profile/contact/location, language, verification and account state.
 - `FarmerProfile`: farmer-specific experience and area-unit preference.
-- `AgriculturalistProfile`: qualifications, specialization, organization, experience, and approval state.
+- `AgriculturalistProfile`: qualifications, specialization, organization, experience, and optional credential-review state.
 - `AgriculturalistVerification`: review decision, reviewer, notes, and timestamp.
 - `UserPreference`: notification choices.
 
@@ -27,6 +27,8 @@ Owner plus name and Farm plus Field-name constraints prevent common duplicates. 
 - `DataImportJob`: actor, type, filename, validation/import counts, errors, and lifecycle timestamps.
 - `HistoricalWeatherObservation`: dated values plus quality flag.
 - `HistoricalCropObservation`: crop/year/season production values.
+- `CropDisease`: a provenance-linked crop/disease pair from the contributor reference dataset.
+- `DiseaseGuidance`: original information label, normalized visualization category, narrative content, source row, and deduplication hash.
 - `WeatherObservation`, `WeatherForecast`, `WeatherAlert`: operational records linked to Region and DataSource.
 
 Unique constraints stop duplicate observations for the same dataset/region/date or source/issued window.

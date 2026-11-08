@@ -95,7 +95,7 @@ Smoke-test:
 - each role dashboard and cross-role denial
 - Farmer ownership/privacy paths
 - assigned versus unassigned Agriculturalist cases
-- Admin approval and data-import failure handling
+- optional Agriculturalist credential review and data-import failure handling
 - AI configured and fallback modes
 - 375, 390, 768, 1024, and 1440 px layouts
 

@@ -54,4 +54,5 @@ class DashboardIntegrationTests(TestCase):
         self.assertIn("@media (min-width: 768px)", css)
         self.assertIn(".feature-grid { grid-template-columns: repeat(3", css)
         self.assertIn("@media (min-width: 1200px)", css)
-        self.assertIn(".workspace-sidebar { display: flex; }", css)
+        self.assertIn(".workspace-sidebar.open { transform: translateX(0); }", css)
+        self.assertIn(".workspace-sidebar { transform: none; }", css)

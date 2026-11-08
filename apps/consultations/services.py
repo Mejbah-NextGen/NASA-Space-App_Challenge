@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from apps.notifications.services import create_notification
 
-from .models import ExpertAssignment, FarmDataConsent
+from .models import Consultation, ExpertAssignment, FarmDataConsent
 
 
 @transaction.atomic
@@ -13,6 +13,23 @@ def assign_consultation(consultation, *, assigned_by=None, share_farm=False, con
     existing_assignment = ExpertAssignment.objects.filter(consultation=consultation).select_related("agriculturalist").first()
     previous_expert = existing_assignment.agriculturalist if existing_assignment else None
     is_reassignment = bool(previous_expert and previous_expert.pk != consultation.agriculturalist_id)
+    active_consent = FarmDataConsent.objects.filter(
+        consultation=consultation,
+        revoked_at__isnull=True,
+    ).first()
+    consent_is_stale = bool(
+        active_consent
+        and (
+            active_consent.agriculturalist_id != consultation.agriculturalist_id
+            or active_consent.farmer_id != consultation.farmer_id
+            or active_consent.farm_id != consultation.farm_id
+        )
+    )
+    if is_reassignment or consent_is_stale:
+        FarmDataConsent.objects.filter(
+            consultation=consultation,
+            revoked_at__isnull=True,
+        ).update(revoked_at=timezone.now())
     defaults = {
         "farmer": consultation.farmer,
         "agriculturalist": consultation.agriculturalist,
@@ -47,7 +64,70 @@ def assign_consultation(consultation, *, assigned_by=None, share_farm=False, con
 
 
 @transaction.atomic
+def close_consultation(consultation, *, status, closed_by):
+    """Close a consultation and retire every access grant in one transaction."""
+    terminal_statuses = {
+        Consultation.Status.COMPLETED,
+        Consultation.Status.CANCELLED,
+        Consultation.Status.DECLINED,
+    }
+    if status not in terminal_statuses:
+        raise ValueError("A consultation can only be closed with a terminal status.")
+
+    consultation = (
+        Consultation.objects.select_for_update()
+        .select_related("farmer", "agriculturalist")
+        .get(pk=consultation.pk)
+    )
+    if consultation.status in terminal_statuses:
+        raise ValueError("This consultation is already closed.")
+    if closed_by.pk not in {consultation.farmer_id, consultation.agriculturalist_id}:
+        raise ValueError("Only a consultation participant may close it.")
+
+    consultation.close(status)
+    ExpertAssignment.objects.filter(
+        consultation=consultation,
+        is_active=True,
+    ).update(is_active=False, ended_at=timezone.now())
+    FarmDataConsent.objects.filter(
+        consultation=consultation,
+        revoked_at__isnull=True,
+    ).update(revoked_at=timezone.now())
+
+    recipient = (
+        consultation.agriculturalist
+        if closed_by.pk == consultation.farmer_id
+        else consultation.farmer
+    )
+    if recipient:
+        notification_title = {
+            Consultation.Status.COMPLETED: "Consultation completed",
+            Consultation.Status.DECLINED: "Consultation declined",
+            Consultation.Status.CANCELLED: "Consultation closed",
+        }[status]
+        create_notification(
+            recipient,
+            kind="CONSULTATION_UPDATED",
+            title=notification_title,
+            body=consultation.title,
+            target_url=(
+                f"/farmer/consultations/{consultation.pk}/"
+                if recipient.pk == consultation.farmer_id
+                else f"/agriculturalist/questions/{consultation.pk}/"
+            ),
+        )
+    return consultation
+
+
+@transaction.atomic
 def grant_farm_data_consent(consultation, *, scope=FarmDataConsent.Scope.SUMMARY):
+    consultation = (
+        Consultation.objects.select_for_update()
+        .select_related("farmer", "agriculturalist", "farm")
+        .get(pk=consultation.pk)
+    )
+    if consultation.status not in {Consultation.Status.ASSIGNED, Consultation.Status.ACTIVE}:
+        raise ValueError("Farm data can only be shared for an open assigned consultation.")
     if not consultation.agriculturalist_id or not consultation.farm_id:
         raise ValueError("An assigned Agriculturalist and farm are required before sharing data.")
     if scope not in FarmDataConsent.Scope.values:

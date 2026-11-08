@@ -1,7 +1,18 @@
+from datetime import date
+
 from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
+
+from apps.agricultural_data.models import (
+    AgriculturalDataset,
+    CropDisease,
+    DataSource,
+    DiseaseGuidance,
+    HistoricalWeatherObservation,
+    Region,
+)
 
 from .forms import SupportTicketForm
 
@@ -38,6 +49,81 @@ class PublicPageSmokeTests(TestCase):
         self.assertContains(response, "DEMONSTRATION DATA")
         self.assertIn("default-src 'self'", response["Content-Security-Policy"])
         self.assertEqual(response["Permissions-Policy"], "camera=(), geolocation=(), microphone=()")
+
+    def test_home_does_not_mix_verified_and_demo_weather_history(self):
+        region = Region.objects.create(district="Kurigram", upazila="Ulipur")
+        verified_source = DataSource.objects.create(
+            name="Verified history source",
+            provider="Test provider",
+            kind=DataSource.Kind.HISTORICAL_WEATHER,
+            is_demo=False,
+        )
+        sample_source = DataSource.objects.create(
+            name="Sample history source",
+            provider="Test provider",
+            kind=DataSource.Kind.HISTORICAL_WEATHER,
+            is_demo=True,
+        )
+        verified_dataset = AgriculturalDataset.objects.create(
+            source=verified_source,
+            title="Verified weather",
+            slug="verified-weather",
+            status=AgriculturalDataset.Status.VERIFIED,
+        )
+        sample_dataset = AgriculturalDataset.objects.create(
+            source=sample_source,
+            title="Sample weather",
+            slug="sample-weather",
+            status=AgriculturalDataset.Status.SAMPLE,
+        )
+        HistoricalWeatherObservation.objects.create(
+            dataset=verified_dataset,
+            region=region,
+            observed_on=date(2025, 6, 1),
+            rainfall_mm="100.00",
+        )
+        HistoricalWeatherObservation.objects.create(
+            dataset=sample_dataset,
+            region=region,
+            observed_on=date(2025, 6, 2),
+            rainfall_mm="900.00",
+        )
+
+        response = self.client.get(reverse("core:home"), {"district": "Kurigram"})
+
+        self.assertEqual(response.context["history_chart"]["rainfall"], [100.0])
+        self.assertFalse(response.context["history_is_demo"])
+
+    def test_home_renders_crop_health_visualization_and_nasa_news(self):
+        source = DataSource.objects.create(
+            name="Contributor disease test",
+            provider="Test contributor",
+            kind=DataSource.Kind.DISEASE,
+            is_active=True,
+            is_demo=True,
+        )
+        dataset = AgriculturalDataset.objects.create(
+            source=source,
+            title="Disease test data",
+            slug="disease-test-data",
+            status=AgriculturalDataset.Status.SAMPLE,
+        )
+        disease = CropDisease.objects.create(dataset=dataset, crop_name="Rice", disease_name="Blast")
+        DiseaseGuidance.objects.create(
+            disease=disease,
+            information_type="Symptoms",
+            category=DiseaseGuidance.Category.IDENTIFICATION,
+            content="Demonstration symptom reference.",
+            content_hash="a" * 64,
+        )
+
+        response = self.client.get(reverse("core:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crop Health Library")
+        self.assertContains(response, "home-crop-disease-data")
+        self.assertContains(response, "NASA agriculture updates")
+        self.assertContains(response, "NISAR will map farmland")
 
     def test_help_creates_ticket(self):
         response = self.client.post(

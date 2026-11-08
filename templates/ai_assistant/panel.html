@@ -38,7 +38,7 @@
       <button class="button button-primary" type="submit">Send</button>
     </form>
     <p id="assistantStatus" class="form-hint" role="status"></p>
-    {% if request.user.role == 'FARMER' %}<a class="text-link" href="{% url 'farmer_consultations:expert_list' %}">Ask a verified Agriculturalist instead</a>{% endif %}
+    {% if request.user.role == 'FARMER' %}<a class="text-link" href="{% url 'farmer_consultations:expert_list' %}">Ask an Agriculturalist instead</a>{% endif %}
   </section>
 </div>
 <script>

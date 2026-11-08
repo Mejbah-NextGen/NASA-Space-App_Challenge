@@ -3,11 +3,11 @@ from pathlib import PurePosixPath
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, FormView, ListView, RedirectView, TemplateView
 
@@ -21,7 +21,14 @@ from apps.weather.views import weather_context
 
 from .forms import AgriculturalistSimulationForm, ConsultationCreateForm, ConsultationMessageForm, RecommendationForm
 from .models import Consultation, ConsultationMessage, ExpertAssignment, ExpertRecommendation, FarmDataConsent
-from .services import assign_consultation, grant_farm_data_consent, notify_message
+from .services import assign_consultation, close_consultation, grant_farm_data_consent, notify_message
+
+
+def _report_form_errors(request, form):
+    for field_name, errors in form.errors.items():
+        label = "Form" if field_name == "__all__" else form.fields[field_name].label
+        for error in errors:
+            messages.error(request, f"{label}: {error}")
 
 
 def _can_access_consultation_media(user, consultation):
@@ -74,7 +81,6 @@ class ExpertDirectoryView(FarmerRequiredMixin, ListView):
         queryset = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
             is_active=True,
-            agriculturalist_profile__is_approved=True,
         )
         queryset = restrict_to_email_verified(queryset).select_related("agriculturalist_profile")
         query = self.request.GET.get("q", "").strip()
@@ -123,6 +129,7 @@ class ConsultationCreateView(FarmerRequiredMixin, CreateView):
             initial["agriculturalist"] = expert_id
         return initial
 
+    @transaction.atomic
     def form_valid(self, form):
         consultation = form.save(commit=False)
         consultation.farmer = self.request.user
@@ -159,8 +166,13 @@ class FarmerConsultationDetailView(FarmerRequiredMixin, DetailView):
 
 
 class FarmerSendMessageView(FarmerRequiredMixin, View):
+    @transaction.atomic
     def post(self, request, pk):
-        consultation = get_object_or_404(Consultation, pk=pk, farmer=request.user)
+        consultation = get_object_or_404(
+            Consultation.objects.select_for_update(),
+            pk=pk,
+            farmer=request.user,
+        )
         if consultation.status in {Consultation.Status.COMPLETED, Consultation.Status.CANCELLED, Consultation.Status.DECLINED}:
             return HttpResponseBadRequest("This consultation is closed.")
         form = ConsultationMessageForm(request.POST, request.FILES)
@@ -173,27 +185,33 @@ class FarmerSendMessageView(FarmerRequiredMixin, View):
             notify_message(message)
             messages.success(request, "Message sent.")
         else:
-            messages.error(request, "Please correct the message and try again.")
+            _report_form_errors(request, form)
         return redirect("farmer_consultations:detail", pk=consultation.pk)
 
 
 class FarmerCloseConsultationView(FarmerRequiredMixin, View):
     def post(self, request, pk):
         consultation = get_object_or_404(Consultation, pk=pk, farmer=request.user)
-        consultation.close(Consultation.Status.CANCELLED)
-        if hasattr(consultation, "assignment"):
-            consultation.assignment.is_active = False
-            consultation.assignment.ended_at = timezone.now()
-            consultation.assignment.save(update_fields=["is_active", "ended_at"])
-        if hasattr(consultation, "data_consent"):
-            consultation.data_consent.revoke()
+        try:
+            close_consultation(
+                consultation,
+                status=Consultation.Status.CANCELLED,
+                closed_by=request.user,
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
         messages.success(request, "The consultation has been closed.")
         return redirect("farmer_consultations:detail", pk=pk)
 
 
 class RevokeConsentView(FarmerRequiredMixin, View):
+    @transaction.atomic
     def post(self, request, pk):
-        consultation = get_object_or_404(Consultation, pk=pk, farmer=request.user)
+        consultation = get_object_or_404(
+            Consultation.objects.select_for_update(),
+            pk=pk,
+            farmer=request.user,
+        )
         if hasattr(consultation, "data_consent"):
             consultation.data_consent.revoke()
             messages.success(request, "Farm-data access has been revoked.")
@@ -213,7 +231,10 @@ class GrantConsentView(FarmerRequiredMixin, View):
             return HttpResponseBadRequest("Invalid consent scope.")
         if not consultation.agriculturalist_id or not consultation.farm_id:
             return HttpResponseBadRequest("An assigned expert and selected farm are required.")
-        grant_farm_data_consent(consultation, scope=scope)
+        try:
+            grant_farm_data_consent(consultation, scope=scope)
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
         messages.success(request, "Farm-data access has been granted to the currently assigned Agriculturalist.")
         return redirect("farmer_consultations:detail", pk=pk)
 
@@ -251,13 +272,25 @@ class AgriculturalistQuestionDetailView(AgriculturalistRequiredMixin, DetailView
         context["message_form"] = ConsultationMessageForm()
         context["recommendation_form"] = RecommendationForm()
         consent = getattr(consultation, "data_consent", None)
-        context["may_view_farm"] = bool(consent and consent.is_active)
+        context["may_view_farm"] = bool(
+            consent
+            and consent.is_active
+            and consultation.status in {Consultation.Status.ASSIGNED, Consultation.Status.ACTIVE}
+            and consent.agriculturalist_id == self.request.user.pk
+            and consent.farmer_id == consultation.farmer_id
+            and consent.farm_id == consultation.farm_id
+        )
         return context
 
 
 class AgriculturalistReplyView(AgriculturalistRequiredMixin, View):
+    @transaction.atomic
     def post(self, request, pk):
-        consultation = get_object_or_404(Consultation, pk=pk, agriculturalist=request.user)
+        consultation = get_object_or_404(
+            Consultation.objects.select_for_update(),
+            pk=pk,
+            agriculturalist=request.user,
+        )
         if consultation.status in {Consultation.Status.COMPLETED, Consultation.Status.CANCELLED, Consultation.Status.DECLINED}:
             return HttpResponseBadRequest("This consultation is closed.")
         form = ConsultationMessageForm(request.POST, request.FILES)
@@ -273,13 +306,24 @@ class AgriculturalistReplyView(AgriculturalistRequiredMixin, View):
             notify_message(reply)
             messages.success(request, "Reply sent.")
         else:
-            messages.error(request, "Please correct the message and try again.")
+            _report_form_errors(request, form)
         return redirect("agriculturalist:question_detail", pk=pk)
 
 
 class RecommendationCreateView(AgriculturalistRequiredMixin, View):
+    @transaction.atomic
     def post(self, request, pk):
-        consultation = get_object_or_404(Consultation, pk=pk, agriculturalist=request.user)
+        consultation = get_object_or_404(
+            Consultation.objects.select_for_update(),
+            pk=pk,
+            agriculturalist=request.user,
+        )
+        if consultation.status in {
+            Consultation.Status.COMPLETED,
+            Consultation.Status.CANCELLED,
+            Consultation.Status.DECLINED,
+        }:
+            return HttpResponseBadRequest("This consultation is closed.")
         form = RecommendationForm(request.POST)
         if form.is_valid():
             recommendation = form.save(commit=False)
@@ -297,26 +341,37 @@ class RecommendationCreateView(AgriculturalistRequiredMixin, View):
                 )
             messages.success(request, "Recommendation saved.")
         else:
-            messages.error(request, "Please correct the recommendation and try again.")
+            _report_form_errors(request, form)
         return redirect("agriculturalist:question_detail", pk=pk)
 
 
 class CompleteConsultationView(AgriculturalistRequiredMixin, View):
     def post(self, request, pk):
         consultation = get_object_or_404(Consultation, pk=pk, agriculturalist=request.user)
-        consultation.close(Consultation.Status.COMPLETED)
-        if hasattr(consultation, "assignment"):
-            consultation.assignment.is_active = False
-            consultation.assignment.ended_at = timezone.now()
-            consultation.assignment.save(update_fields=["is_active", "ended_at"])
-        create_notification(
-            consultation.farmer,
-            kind="CONSULTATION_UPDATED",
-            title="Consultation completed",
-            body=consultation.title,
-            target_url=f"/farmer/consultations/{consultation.pk}/",
-        )
+        try:
+            close_consultation(
+                consultation,
+                status=Consultation.Status.COMPLETED,
+                closed_by=request.user,
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
         messages.success(request, "Consultation marked completed.")
+        return redirect("agriculturalist:question_detail", pk=pk)
+
+
+class DeclineConsultationView(AgriculturalistRequiredMixin, View):
+    def post(self, request, pk):
+        consultation = get_object_or_404(Consultation, pk=pk, agriculturalist=request.user)
+        try:
+            close_consultation(
+                consultation,
+                status=Consultation.Status.DECLINED,
+                closed_by=request.user,
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
+        messages.success(request, "The consultation request was declined and is now read-only.")
         return redirect("agriculturalist:question_detail", pk=pk)
 
 

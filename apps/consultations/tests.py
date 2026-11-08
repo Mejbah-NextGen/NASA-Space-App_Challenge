@@ -1,6 +1,7 @@
 from decimal import Decimal
 from pathlib import Path
 import shutil
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.conf import settings
@@ -13,7 +14,8 @@ from apps.farms.models import AreaUnit, Crop, Farm
 from apps.notifications.models import Notification
 
 from .forms import ConsultationCreateForm
-from .models import Consultation, ConsultationMessage, ExpertRecommendation, FarmDataConsent
+from .models import Consultation, ConsultationMessage, ExpertAssignment, ExpertRecommendation, FarmDataConsent
+from .services import assign_consultation, grant_farm_data_consent
 
 
 class ConsultationPermissionTests(TestCase):
@@ -43,17 +45,13 @@ class ConsultationPermissionTests(TestCase):
             is_verified=True,
         )
         self.expert = User.objects.create_user(
-            email="expert@example.test", password="StrongPass123!", full_name="Approved Expert", role=User.Role.AGRICULTURALIST,
+            email="expert@example.test", password="StrongPass123!", full_name="Community Agriculturalist", role=User.Role.AGRICULTURALIST,
             is_verified=True,
         )
-        self.expert.agriculturalist_profile.is_approved = True
-        self.expert.agriculturalist_profile.save(update_fields=["is_approved"])
         self.other_expert = User.objects.create_user(
             email="otherexpert@example.test", password="StrongPass123!", full_name="Other Expert", role=User.Role.AGRICULTURALIST,
             is_verified=True,
         )
-        self.other_expert.agriculturalist_profile.is_approved = True
-        self.other_expert.agriculturalist_profile.save(update_fields=["is_approved"])
         self.farm = Farm.objects.create(
             owner=self.farmer,
             name="River Farm",
@@ -73,7 +71,7 @@ class ConsultationPermissionTests(TestCase):
         )
 
     @override_settings(EMAIL_VERIFICATION_ENABLED=False)
-    def test_approved_unverified_expert_is_available_while_email_verification_is_disabled(self):
+    def test_unreviewed_unverified_expert_is_available_while_email_verification_is_disabled(self):
         self.expert.is_verified = False
         self.expert.save(update_fields=["is_verified"])
 
@@ -82,9 +80,10 @@ class ConsultationPermissionTests(TestCase):
         self.client.force_login(self.farmer)
         response = self.client.get(reverse("farmer_consultations:expert_list"))
         self.assertContains(response, self.expert.full_name)
+        self.assertContains(response, "Community agriculturalist")
 
     @override_settings(EMAIL_VERIFICATION_ENABLED=True)
-    def test_approved_unverified_expert_is_hidden_when_email_verification_is_enabled(self):
+    def test_unreviewed_unverified_expert_is_hidden_when_email_verification_is_enabled(self):
         self.expert.is_verified = False
         self.expert.save(update_fields=["is_verified"])
 
@@ -113,6 +112,23 @@ class ConsultationPermissionTests(TestCase):
         self.assertEqual(consultation.status, Consultation.Status.ASSIGNED)
         self.assertTrue(consultation.data_consent.is_active)
         self.assertTrue(Notification.objects.filter(user=self.expert, kind=Notification.Kind.CONSULTATION_ASSIGNED).exists())
+
+    def test_consultation_creation_rolls_back_if_assignment_fails(self):
+        self.client.force_login(self.farmer)
+        with patch("apps.consultations.views.assign_consultation", side_effect=RuntimeError("assignment failed")):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("farmer_consultations:create"),
+                    {
+                        "agriculturalist": self.expert.pk,
+                        "farm": self.farm.pk,
+                        "title": "Atomic consultation",
+                        "description": "This record must roll back if assignment fails.",
+                        "priority": Consultation.Priority.NORMAL,
+                        "consent_scope": FarmDataConsent.Scope.SUMMARY,
+                    },
+                )
+        self.assertFalse(Consultation.objects.filter(title="Atomic consultation").exists())
 
     def test_farmer_cannot_read_another_farmers_consultation(self):
         consultation = self.create_consultation()
@@ -191,6 +207,165 @@ class ConsultationPermissionTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertFalse(ExpertRecommendation.objects.filter(title="Unauthorized recommendation").exists())
+
+    def test_published_timestamp_is_cleared_when_recommendation_is_withdrawn(self):
+        consultation = self.create_consultation()
+        recommendation = ExpertRecommendation.objects.create(
+            consultation=consultation,
+            agriculturalist=self.expert,
+            title="Temporary guidance",
+            explanation="This guidance will be withdrawn.",
+            status=ExpertRecommendation.Status.PUBLISHED,
+        )
+        self.assertIsNotNone(recommendation.published_at)
+        recommendation.status = ExpertRecommendation.Status.WITHDRAWN
+        recommendation.save(update_fields=["status"])
+        recommendation.refresh_from_db()
+        self.assertIsNone(recommendation.published_at)
+
+    def test_closed_consultation_rejects_new_messages_and_recommendations(self):
+        consultation = self.create_consultation()
+        consultation.close(Consultation.Status.COMPLETED)
+
+        self.client.force_login(self.expert)
+        reply = self.client.post(
+            reverse("agriculturalist:reply", args=[consultation.pk]),
+            {"body": "This must not be added."},
+        )
+        recommendation = self.client.post(
+            reverse("agriculturalist:recommend", args=[consultation.pk]),
+            {
+                "title": "Too late",
+                "explanation": "Closed cases are read-only.",
+                "priority": ExpertRecommendation.Priority.INFO,
+                "status": ExpertRecommendation.Status.PUBLISHED,
+            },
+        )
+        self.assertEqual(reply.status_code, 400)
+        self.assertEqual(recommendation.status_code, 400)
+        self.assertFalse(ConsultationMessage.objects.filter(body="This must not be added.").exists())
+        self.assertFalse(ExpertRecommendation.objects.filter(title="Too late").exists())
+
+        self.client.force_login(self.farmer)
+        farmer_message = self.client.post(
+            reverse("farmer_consultations:message", args=[consultation.pk]),
+            {"body": "This must also be rejected."},
+        )
+        self.assertEqual(farmer_message.status_code, 400)
+        self.assertFalse(ConsultationMessage.objects.filter(body="This must also be rejected.").exists())
+
+    def test_expert_completion_retires_assignment_and_consent(self):
+        consultation = self.create_consultation()
+        assign_consultation(consultation, share_farm=True, consent_scope=FarmDataConsent.Scope.FULL)
+
+        self.client.force_login(self.expert)
+        response = self.client.post(reverse("agriculturalist:complete", args=[consultation.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        consultation.refresh_from_db()
+        consultation.assignment.refresh_from_db()
+        consultation.data_consent.refresh_from_db()
+        self.assertEqual(consultation.status, Consultation.Status.COMPLETED)
+        self.assertFalse(consultation.assignment.is_active)
+        self.assertIsNotNone(consultation.assignment.ended_at)
+        self.assertFalse(consultation.data_consent.is_active)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.farmer,
+                kind=Notification.Kind.CONSULTATION_UPDATED,
+                title="Consultation completed",
+            ).exists()
+        )
+
+        repeated = self.client.post(reverse("agriculturalist:complete", args=[consultation.pk]))
+        self.assertEqual(repeated.status_code, 400)
+
+    def test_expert_can_decline_and_retire_assignment_and_consent(self):
+        consultation = self.create_consultation()
+        assign_consultation(consultation, share_farm=True)
+
+        self.client.force_login(self.expert)
+        response = self.client.post(reverse("agriculturalist:decline", args=[consultation.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        consultation.refresh_from_db()
+        consultation.assignment.refresh_from_db()
+        consultation.data_consent.refresh_from_db()
+        self.assertEqual(consultation.status, Consultation.Status.DECLINED)
+        self.assertFalse(consultation.assignment.is_active)
+        self.assertFalse(consultation.data_consent.is_active)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.farmer,
+                kind=Notification.Kind.CONSULTATION_UPDATED,
+                title="Consultation declined",
+            ).exists()
+        )
+
+    def test_consent_service_rejects_a_closed_consultation(self):
+        consultation = self.create_consultation()
+        consultation.close(Consultation.Status.CANCELLED)
+
+        with self.assertRaisesMessage(ValueError, "open assigned consultation"):
+            grant_farm_data_consent(consultation, scope=FarmDataConsent.Scope.FULL)
+
+        self.assertFalse(
+            FarmDataConsent.objects.filter(consultation=consultation, revoked_at__isnull=True).exists()
+        )
+
+    def test_farmer_close_retires_assignment_and_notifies_agriculturalist(self):
+        consultation = self.create_consultation()
+        assign_consultation(consultation, share_farm=True)
+
+        self.client.force_login(self.farmer)
+        response = self.client.post(reverse("farmer_consultations:close", args=[consultation.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        consultation.refresh_from_db()
+        consultation.assignment.refresh_from_db()
+        consultation.data_consent.refresh_from_db()
+        self.assertEqual(consultation.status, Consultation.Status.CANCELLED)
+        self.assertFalse(consultation.assignment.is_active)
+        self.assertFalse(consultation.data_consent.is_active)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.expert,
+                kind=Notification.Kind.CONSULTATION_UPDATED,
+                title="Consultation closed",
+            ).exists()
+        )
+
+    def test_reassignment_revokes_stale_consent(self):
+        consultation = self.create_consultation()
+        assign_consultation(consultation, share_farm=True)
+        consent = consultation.data_consent
+
+        consultation.agriculturalist = self.other_expert
+        consultation.save(update_fields=["agriculturalist", "updated_at"])
+        assign_consultation(consultation)
+
+        consent.refresh_from_db()
+        assignment = ExpertAssignment.objects.get(consultation=consultation)
+        self.assertFalse(consent.is_active)
+        self.assertEqual(assignment.agriculturalist, self.other_expert)
+
+    def test_stale_consent_does_not_expose_farm_to_reassigned_agriculturalist(self):
+        consultation = self.create_consultation()
+        FarmDataConsent.objects.create(
+            consultation=consultation,
+            farmer=self.farmer,
+            agriculturalist=self.expert,
+            farm=self.farm,
+        )
+        consultation.agriculturalist = self.other_expert
+        consultation.save(update_fields=["agriculturalist", "updated_at"])
+
+        self.client.force_login(self.other_expert)
+        response = self.client.get(reverse("agriculturalist:question_detail", args=[consultation.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["may_view_farm"])
+        self.assertNotContains(response, self.farm.name)
 
     def test_private_consultation_media_is_available_only_to_participants_and_admin(self):
         consultation = self.create_consultation()
@@ -380,17 +555,17 @@ class ConsultationPermissionTests(TestCase):
         self.assertEqual(consent.agriculturalist, self.other_expert)
         self.assertEqual(consent.scope, FarmDataConsent.Scope.FULL)
 
-    def test_history_and_weather_workspaces_render_for_approved_expert(self):
+    def test_history_and_weather_workspaces_render_for_unreviewed_agriculturalist(self):
         self.client.force_login(self.expert)
         self.assertEqual(self.client.get(reverse("agriculturalist:history")).status_code, 200)
         self.assertEqual(self.client.get(reverse("agriculturalist:weather")).status_code, 200)
 
 
-class PendingAgriculturalistTests(TestCase):
-    def test_pending_agriculturalist_is_denied_expert_inbox(self):
+class OpenRegistrationAgriculturalistTests(TestCase):
+    def test_unreviewed_agriculturalist_can_open_expert_inbox(self):
         expert = User.objects.create_user(
             email="pending@example.test", password="StrongPass123!", full_name="Pending Expert", role=User.Role.AGRICULTURALIST
         )
         self.client.force_login(expert)
         response = self.client.get(reverse("agriculturalist:questions"))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)

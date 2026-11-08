@@ -24,6 +24,7 @@ class DataSource(models.Model):
         WEATHER = "WEATHER", "Weather"
         HISTORICAL_WEATHER = "HIST_WEATHER", "Historical weather"
         CROP = "CROP", "Crop production"
+        DISEASE = "DISEASE", "Crop disease guidance"
         SATELLITE = "SATELLITE", "Satellite"
         MANUAL = "MANUAL", "Manual submission"
 
@@ -85,6 +86,7 @@ class DataImportJob(models.Model):
     class Kind(models.TextChoices):
         WEATHER = "WEATHER", "Historical weather"
         CROP = "CROP", "Historical crop production"
+        DISEASE = "DISEASE", "Crop disease guidance"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
@@ -178,3 +180,55 @@ class HistoricalCropObservation(models.Model):
 
     def __str__(self):
         return f"{self.crop_name}, {self.region} ({self.year})"
+
+
+class CropDisease(models.Model):
+    """A crop and disease pair from a provenance-labelled reference dataset."""
+
+    dataset = models.ForeignKey(AgriculturalDataset, on_delete=models.CASCADE, related_name="crop_diseases")
+    crop_name = models.CharField(max_length=100, db_index=True)
+    disease_name = models.CharField(max_length=160, db_index=True)
+
+    class Meta:
+        ordering = ["crop_name", "disease_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dataset", "crop_name", "disease_name"],
+                name="unique_crop_disease_per_dataset",
+            )
+        ]
+        indexes = [models.Index(fields=["crop_name", "disease_name"])]
+
+    def __str__(self):
+        return f"{self.crop_name} - {self.disease_name}"
+
+
+class DiseaseGuidance(models.Model):
+    class Category(models.TextChoices):
+        PREVENTION = "PREVENTION", "Prevention & field practice"
+        IDENTIFICATION = "IDENTIFICATION", "Identification & symptoms"
+        TREATMENT = "TREATMENT", "Treatment & application"
+        BIOLOGY = "BIOLOGY", "Disease biology & risk"
+        IMPACT = "IMPACT", "Impact & monitoring"
+        BIOLOGICAL = "BIOLOGICAL", "Biological & organic options"
+        OTHER = "OTHER", "Other / context"
+
+    disease = models.ForeignKey(CropDisease, on_delete=models.CASCADE, related_name="guidance_entries")
+    information_type = models.CharField(max_length=160)
+    category = models.CharField(max_length=20, choices=Category.choices, db_index=True)
+    content = models.TextField()
+    content_hash = models.CharField(max_length=64)
+    source_row = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["category", "information_type", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["disease", "content_hash"],
+                name="unique_guidance_content_per_disease",
+            )
+        ]
+        indexes = [models.Index(fields=["category", "information_type"])]
+
+    def __str__(self):
+        return f"{self.disease}: {self.information_type}"

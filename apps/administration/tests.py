@@ -65,7 +65,7 @@ class AdministrationWorkflowTests(TestCase):
         self.assertContains(response, farmer.email)
         self.assertEqual(response.context["farm_count"], 1)
 
-    def test_admin_approval_enables_expert_access(self):
+    def test_admin_review_records_credential_badge(self):
         expert = User.objects.create_user(
             email="applicant@example.com",
             password="StrongLocalPass@2026",
@@ -157,7 +157,7 @@ class AdministrationWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("'=DANGEROUS()", response.content.decode())
 
-    def test_admin_can_assign_approved_expert_to_pending_consultation(self):
+    def test_admin_can_assign_unreviewed_agriculturalist_to_pending_consultation(self):
         farmer = User.objects.create_user(
             email="assignment-farmer@example.com",
             password="StrongLocalPass@2026",
@@ -171,12 +171,10 @@ class AdministrationWorkflowTests(TestCase):
             role=User.Role.AGRICULTURALIST,
             is_verified=True,
         )
-        expert.agriculturalist_profile.is_approved = True
-        expert.agriculturalist_profile.save(update_fields=["is_approved"])
         consultation = Consultation.objects.create(
             farmer=farmer,
             title="Pending assignment",
-            description="Please assign a verified expert.",
+            description="Please assign an agriculturalist.",
         )
         response = self.client.post(
             reverse("administration:assignment_action"),

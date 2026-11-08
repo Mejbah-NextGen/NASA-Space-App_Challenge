@@ -51,9 +51,6 @@ class Consultation(models.Model):
         if self.agriculturalist_id:
             if self.agriculturalist.role != "AGRICULTURALIST":
                 raise ValidationError({"agriculturalist": "The selected expert is not an Agriculturalist."})
-            profile = getattr(self.agriculturalist, "agriculturalist_profile", None)
-            if not profile or not profile.is_approved:
-                raise ValidationError({"agriculturalist": "The selected Agriculturalist is not approved."})
         if self.farm_id and self.farmer_id and self.farm.owner_id != self.farmer_id:
             raise ValidationError({"farm": "You can only share a farm that belongs to the requester."})
 
@@ -147,6 +144,10 @@ class ExpertRecommendation(models.Model):
     def save(self, *args, **kwargs):
         if self.status == self.Status.PUBLISHED and not self.published_at:
             self.published_at = timezone.now()
+        elif self.status != self.Status.PUBLISHED:
+            self.published_at = None
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"published_at"}
         super().save(*args, **kwargs)
 
 

@@ -1,12 +1,21 @@
 from collections import defaultdict
 
-from django.db.models import Avg, Max, Q, Sum
+from django.core.paginator import Paginator
+from django.db.models import Avg, Count, Exists, Max, OuterRef, Prefetch, Q, Sum
 from django.db.models.functions import ExtractYear
 from django.views.generic import TemplateView
 
 from apps.accounts.permissions import FarmerRequiredMixin
 
-from .models import AgriculturalDataset, DataSource, HistoricalCropObservation, HistoricalWeatherObservation, Region
+from .models import (
+    AgriculturalDataset,
+    CropDisease,
+    DataSource,
+    DiseaseGuidance,
+    HistoricalCropObservation,
+    HistoricalWeatherObservation,
+    Region,
+)
 
 
 DEMO_RAINFALL = [980, 1120, 870, 640, 1050, 910, 980, 760, 850, 920]
@@ -175,6 +184,109 @@ class CropInsightsView(TemplateView):
                 "selected_district": district,
                 "crops": HistoricalCropObservation.objects.filter(dataset__status__in=public_statuses).order_by("crop_name").values_list("crop_name", flat=True).distinct(),
                 "districts": Region.objects.filter(historical_crops__dataset__status__in=public_statuses).order_by("district").values_list("district", flat=True).distinct(),
+            }
+        )
+        return context
+
+
+class CropHealthView(TemplateView):
+    template_name = "public/crop_health.html"
+    paginate_by = 12
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = self.request.GET.get("q", "").strip()[:120]
+        crop = self.request.GET.get("crop", "").strip()[:100]
+        category = self.request.GET.get("category", "").strip().upper()
+        if category not in DiseaseGuidance.Category.values:
+            category = ""
+
+        public_statuses = [AgriculturalDataset.Status.VERIFIED, AgriculturalDataset.Status.SAMPLE]
+        public_diseases = CropDisease.objects.filter(
+            dataset__status__in=public_statuses,
+            dataset__source__is_active=True,
+        )
+        visible_guidance = DiseaseGuidance.objects.all()
+        if category:
+            visible_guidance = visible_guidance.filter(category=category)
+        if query:
+            visible_guidance = visible_guidance.filter(
+                Q(disease__crop_name__icontains=query)
+                | Q(disease__disease_name__icontains=query)
+                | Q(information_type__icontains=query)
+                | Q(content__icontains=query)
+            )
+
+        filtered = public_diseases
+        if crop:
+            filtered = filtered.filter(crop_name__iexact=crop)
+        if category or query:
+            filtered = filtered.annotate(
+                has_visible_guidance=Exists(
+                    visible_guidance.filter(disease_id=OuterRef("pk"))
+                )
+            ).filter(
+                has_visible_guidance=True
+            )
+        filtered = (
+            filtered.select_related("dataset", "dataset__source")
+            .prefetch_related(
+                Prefetch(
+                    "guidance_entries",
+                    queryset=visible_guidance.order_by("category", "information_type", "pk"),
+                    to_attr="visible_guidance",
+                )
+            )
+            .distinct()
+            .order_by("crop_name", "disease_name")
+        )
+
+        paginator = Paginator(filtered, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        guidance = DiseaseGuidance.objects.filter(disease__in=public_diseases)
+        top_crops = list(
+            public_diseases.order_by()
+            .values("crop_name")
+            .annotate(disease_count=Count("id", distinct=True))
+            .order_by("-disease_count", "crop_name")[:10]
+        )
+        category_counts = {
+            row["category"]: row["count"]
+            for row in guidance.order_by().values("category").annotate(count=Count("id"))
+        }
+        library_dataset = (
+            AgriculturalDataset.objects.filter(crop_diseases__in=public_diseases)
+            .select_related("source")
+            .distinct()
+            .order_by("-updated_at")
+            .first()
+        )
+        context.update(
+            {
+                "diseases": page_obj.object_list,
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "is_paginated": paginator.num_pages > 1,
+                "selected_query": query,
+                "selected_crop": crop,
+                "selected_category": category,
+                "crops": public_diseases.order_by("crop_name").values_list("crop_name", flat=True).distinct(),
+                "category_choices": DiseaseGuidance.Category.choices,
+                "library_dataset": library_dataset,
+                "library_summary": {
+                    "crops": public_diseases.order_by().values("crop_name").distinct().count(),
+                    "diseases": public_diseases.count(),
+                    "guidance": guidance.count(),
+                },
+                "crop_chart": {
+                    "labels": [row["crop_name"] for row in top_crops],
+                    "values": [row["disease_count"] for row in top_crops],
+                },
+                "category_chart": {
+                    "labels": [label for value, label in DiseaseGuidance.Category.choices],
+                    "values": [category_counts.get(value, 0) for value, label in DiseaseGuidance.Category.choices],
+                },
             }
         )
         return context

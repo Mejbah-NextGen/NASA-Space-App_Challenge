@@ -1,0 +1,159 @@
+{% extends "public/base_public.html" %}
+{% block title %}Crop Health Library - Farm Time Machine{% endblock %}
+{% block content %}
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Contributor reference dataset</span>
+    <h1>Explore crop diseases and field guidance</h1>
+    <p>Search symptoms, prevention practices, disease biology, monitoring notes, and treatment references across the supplied crop-health dataset.</p>
+  </div>
+</section>
+
+<section class="pb-5">
+  <div class="container">
+    <div class="alert alert-warning" role="alert">
+      <strong>Sample, unverified guidance.</strong>
+      This contributor-supplied library is not NASA data and does not replace local diagnosis. Before using any pesticide, fungicide, dose, interval, or pre-harvest recommendation, confirm the current product label and local approval with a qualified agriculturalist.
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-3 g-3 my-4" aria-label="Crop health dataset summary">
+      <div class="col"><article class="card h-100 border-0 shadow-sm"><div class="card-body"><span class="text-secondary">Crops covered</span><strong class="display-6 d-block">{{ library_summary.crops }}</strong></div></article></div>
+      <div class="col"><article class="card h-100 border-0 shadow-sm"><div class="card-body"><span class="text-secondary">Crop-disease pairs</span><strong class="display-6 d-block">{{ library_summary.diseases }}</strong></div></article></div>
+      <div class="col"><article class="card h-100 border-0 shadow-sm"><div class="card-body"><span class="text-secondary">Guidance entries</span><strong class="display-6 d-block">{{ library_summary.guidance }}</strong></div></article></div>
+    </div>
+
+    {% if library_summary.guidance %}
+    <div class="row g-4 mb-5">
+      <div class="col-lg-7">
+        <article class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h2 class="h5">Crops with the most distinct diseases</h2>
+            <p class="text-secondary small">Counts describe this reference file, not real-world prevalence or local risk.</p>
+            <div class="chart-wrap"><canvas id="cropDiseaseChart" aria-label="Top crops by disease entries"></canvas></div>
+          </div>
+        </article>
+      </div>
+      <div class="col-lg-5">
+        <article class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h2 class="h5">Guidance mix</h2>
+            <p class="text-secondary small">The 723 supplied labels are grouped into seven readable categories while every original label remains available.</p>
+            <div class="chart-wrap"><canvas id="guidanceCategoryChart" aria-label="Guidance entries by normalized category"></canvas></div>
+          </div>
+        </article>
+      </div>
+    </div>
+    {% endif %}
+
+    <form class="filter-card row g-3 align-items-end" method="get" role="search">
+      <div class="col-lg-5">
+        <label class="form-label" for="crop-health-query">Search the library</label>
+        <input class="form-control" id="crop-health-query" type="search" name="q" value="{{ selected_query }}" placeholder="Disease, symptom, practice, or treatment">
+      </div>
+      <div class="col-md-5 col-lg-3">
+        <label class="form-label" for="crop-health-crop">Crop</label>
+        <select class="form-select" id="crop-health-crop" name="crop">
+          <option value="">All crops</option>
+          {% for value in crops %}<option value="{{ value }}"{% if value == selected_crop %} selected{% endif %}>{{ value }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-5 col-lg-3">
+        <label class="form-label" for="crop-health-category">Guidance category</label>
+        <select class="form-select" id="crop-health-category" name="category">
+          <option value="">All categories</option>
+          {% for value, label in category_choices %}<option value="{{ value }}"{% if value == selected_category %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 col-lg-1"><button class="btn btn-success w-100" type="submit">Find</button></div>
+    </form>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 mb-3">
+      <div>
+        <span class="eyebrow">Disease library</span>
+        <h2 class="h3 mb-0">{{ paginator.count }} matching crop-disease pair{{ paginator.count|pluralize }}</h2>
+      </div>
+      {% if selected_query or selected_crop or selected_category %}<a class="btn btn-outline-success" href="{% url 'agricultural_data:crop_health' %}">Clear filters</a>{% endif %}
+    </div>
+
+    <div class="row row-cols-1 row-cols-lg-2 g-4">
+      {% for disease in diseases %}
+      <div class="col">
+        <article class="card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+              <div><span class="data-badge sample">Sample reference</span><h3 class="h4 mt-2 mb-1">{{ disease.disease_name }}</h3><p class="text-success fw-bold mb-0">{{ disease.crop_name }}</p></div>
+              <small class="text-secondary">{{ disease.visible_guidance|length }} entr{{ disease.visible_guidance|length|pluralize:"y,ies" }}</small>
+            </div>
+            <div class="mt-3">
+              {% for entry in disease.visible_guidance %}
+              <details class="border-top py-3">
+                <summary class="fw-bold">{{ entry.information_type }} <span class="fw-normal text-secondary">· {{ entry.get_category_display }}</span></summary>
+                <p class="mt-3 mb-2">{{ entry.content|linebreaksbr }}</p>
+                {% if entry.category == 'TREATMENT' %}<p class="small text-danger mb-0"><strong>Verify locally:</strong> product registration, label rate, protective equipment, resistance rotation, and pre-harvest interval can differ by place and date.</p>{% endif %}
+              </details>
+              {% empty %}
+              <p class="text-secondary mt-3">No entries in the selected category.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </article>
+      </div>
+      {% empty %}
+      <div class="col-12">
+        <div class="empty-state card">
+          <h3>{% if library_summary.guidance %}No guidance matches these filters{% else %}The crop-health dataset has not been imported{% endif %}</h3>
+          {% if library_summary.guidance %}<p>Try a broader search, another crop, or all categories.</p>{% else %}<p>Import the bundled CSV with <code>python manage.py import_crop_diseases fixtures/crop_disease_treatment.csv</code>.</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <nav class="mt-4" aria-label="Crop health result pages">
+      <ul class="pagination justify-content-center flex-wrap">
+        {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ selected_query|urlencode }}&amp;crop={{ selected_crop|urlencode }}&amp;category={{ selected_category|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?q={{ selected_query|urlencode }}&amp;crop={{ selected_crop|urlencode }}&amp;category={{ selected_category|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+
+    {% if library_dataset %}
+    <div class="source-panel mt-5">
+      <strong>Dataset provenance</strong>
+      <p class="mb-1">{{ library_dataset.title }} · {{ library_dataset.get_status_display }} · {{ library_dataset.source.name }}</p>
+      <small>{{ library_dataset.quality_notes }}</small>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{{ crop_chart|json_script:"crop-disease-chart-data" }}
+{{ category_chart|json_script:"guidance-category-chart-data" }}
+{% endblock %}
+{% block extra_js %}
+<script>
+(() => {
+  if (!window.Chart) return;
+  const cropNode = document.getElementById('crop-disease-chart-data');
+  const cropCanvas = document.getElementById('cropDiseaseChart');
+  if (cropNode && cropCanvas) {
+    const data = JSON.parse(cropNode.textContent);
+    new Chart(cropCanvas, {
+      type: 'bar',
+      data: {labels: data.labels, datasets: [{label: 'Distinct diseases', data: data.values, backgroundColor: '#20734D', borderRadius: 5}]},
+      options: {indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {x: {beginAtZero: true, ticks: {precision: 0}}}}
+    });
+  }
+  const categoryNode = document.getElementById('guidance-category-chart-data');
+  const categoryCanvas = document.getElementById('guidanceCategoryChart');
+  if (categoryNode && categoryCanvas) {
+    const data = JSON.parse(categoryNode.textContent);
+    new Chart(categoryCanvas, {
+      type: 'doughnut',
+      data: {labels: data.labels, datasets: [{data: data.values, backgroundColor: ['#20734D', '#3F8F68', '#D69E2E', '#3973A8', '#8B5FA8', '#75A843', '#84929C']}]},
+      options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}
+    });
+  }
+})();
+</script>
+{% endblock %}

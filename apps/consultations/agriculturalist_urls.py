@@ -26,6 +26,7 @@ urlpatterns = [
     path("questions/<int:pk>/reply/", views.AgriculturalistReplyView.as_view(), name="reply"),
     path("questions/<int:pk>/recommend/", views.RecommendationCreateView.as_view(), name="recommend"),
     path("questions/<int:pk>/complete/", views.CompleteConsultationView.as_view(), name="complete"),
+    path("questions/<int:pk>/decline/", views.DeclineConsultationView.as_view(), name="decline"),
     path("weather/", views.AgriculturalistWeatherView.as_view(), name="weather"),
     path("learning/", RedirectView.as_view(pattern_name="learning:list", permanent=False), name="learning"),
     path("support/", views.AgriculturalistModuleView.as_view(

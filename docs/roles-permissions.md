@@ -11,7 +11,7 @@ Can:
 - manage only their own farms, fields, crop records, activities, and tasks;
 - run/save only scenarios tied to their farms;
 - create/view/update only their decision journal and outcomes;
-- browse approved Agriculturalists;
+- browse active Agriculturalists and see whether credentials have been reviewed;
 - create consultations and choose which owned Farm to share;
 - participate only in their own consultation threads;
 - revoke active Farm-data consent and close their own consultation;
@@ -21,12 +21,9 @@ Another Farmer’s object is excluded from the queryset before lookup. The resul
 
 ## Agriculturalist
 
-Public signup creates a pending professional application. Verified expert functionality requires both:
+Public signup creates an immediately usable Agriculturalist account. Credential review remains available as an informational trust signal through `AgriculturalistProfile.is_approved`; it is not an access gate.
 
-1. `AgriculturalistProfile.is_approved=True`
-2. an Admin-recorded approval workflow
-
-An approved Agriculturalist can view only assigned cases and Farmer context covered by that case’s active consent. They may reply, create recommendations, update allowed consultation state, and draft/submit learning resources. They cannot search arbitrary private Farms or unassigned Farmer records.
+An active Agriculturalist can appear in the Farmer directory and view only cases assigned to them. Farmer context is visible only while that case has matching, active consent. They may reply, create recommendations, resolve or decline a consultation, and draft/submit learning resources. They cannot search arbitrary private Farms or unassigned Farmer records. Resolving, declining, or otherwise closing a case deactivates its assignment and revokes its farm-data consent.
 
 ## Platform Admin
 
@@ -45,7 +42,7 @@ The custom platform dashboard is the primary Admin experience. `/django-admin/` 
 ## Enforcement map
 
 - `FarmerRequiredMixin`: authenticated Farmer only.
-- `AgriculturalistRequiredMixin`: authenticated Agriculturalist with approved profile.
+- `AgriculturalistRequiredMixin`: authenticated Agriculturalist with a role profile; credential review is not required.
 - `PlatformAdminRequiredMixin`: authenticated Admin only.
 - Owner-filtered querysets: Farm, Field, Planting, Simulation, Decision, Consultation, Notification, AI Conversation.
 - Assignment/consent filters: Agriculturalist case and shared Farm access.

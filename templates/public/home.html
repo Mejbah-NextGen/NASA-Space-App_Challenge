@@ -53,10 +53,99 @@
       <div class="col"><a class="feature-card" href="{% url 'agricultural_data:public_history' %}"><span>01</span><h3>Farm History</h3><p>Compare rainfall, heat, and crop production through time.</p></a></div>
       <div class="col"><a class="feature-card" href="{% url 'accounts:signup' %}"><span>02</span><h3>Farm Simulator</h3><p>Explore transparent rule-based crop scenarios.</p></a></div>
       <div class="col"><a class="feature-card" href="{% url 'accounts:login' %}"><span>03</span><h3>AI Farm Assistant</h3><p>Ask grounded questions with clear caveats and sources.</p></a></div>
-      <div class="col"><a class="feature-card" href="{% url 'accounts:signup' %}"><span>04</span><h3>Expert Consultation</h3><p>Share selected farm information with verified professionals.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'accounts:signup' %}"><span>04</span><h3>Expert Consultation</h3><p>Share selected farm information and collaborate with agriculturalists.</p></a></div>
       <div class="col"><a class="feature-card" href="{% url 'weather:public_weather' %}"><span>05</span><h3>Weather &amp; Alerts</h3><p>See source-labelled forecasts and risk context.</p></a></div>
-      <div class="col"><a class="feature-card" href="{% url 'core:how_it_works' %}"><span>06</span><h3>Learning Center</h3><p>Use practical guides while understanding data limits.</p></a></div>
+      <div class="col"><a class="feature-card" href="{% url 'learning:list' %}"><span>06</span><h3>Learning Center</h3><p>Use practical guides while understanding data limits.</p></a></div>
     </div>
+  </div>
+</section>
+
+<section class="py-5" id="crop-health-library" aria-labelledby="crop-health-heading">
+  <div class="container">
+    <div class="row align-items-end g-3">
+      <div class="col-lg-8">
+        <span class="eyebrow">Crop disease dataset</span>
+        <h2 class="display-6 fw-bold mt-2" id="crop-health-heading">Turn 3,000+ guidance records into a searchable view</h2>
+        <p class="lead mb-0">Explore symptoms, prevention, disease biology, monitoring, and treatment references from the contributor-supplied CSV.</p>
+      </div>
+      <div class="col-lg-4 text-lg-end"><a class="btn btn-success btn-lg" href="{% url 'agricultural_data:crop_health' %}">Open Crop Health Library</a></div>
+    </div>
+
+    {% if crop_health.available %}
+      <div class="row row-cols-1 row-cols-sm-3 g-3 mt-4" aria-label="Crop disease dataset summary">
+        <div class="col"><article class="metric-card h-100"><small>Crops covered</small><strong>{{ crop_health.crop_count }}</strong><span>in the supplied file</span></article></div>
+        <div class="col"><article class="metric-card h-100"><small>Crop-disease pairs</small><strong>{{ crop_health.disease_count }}</strong><span>distinct dataset entries</span></article></div>
+        <div class="col"><article class="metric-card h-100"><small>Guidance records</small><strong>{{ crop_health.guidance_count }}</strong><span>after exact deduplication</span></article></div>
+      </div>
+      <div class="row g-4 mt-2">
+        <div class="col-lg-7"><article class="card h-100 shadow-sm"><div class="card-body"><h3 class="h5">Top crops by distinct diseases in the file</h3><p class="small text-secondary">Dataset coverage, not disease prevalence or local risk.</p><div class="chart-wrap"><canvas id="homeCropDiseaseChart" aria-label="Top crops by disease count"></canvas></div></div></article></div>
+        <div class="col-lg-5"><article class="card h-100 shadow-sm"><div class="card-body"><h3 class="h5">Guidance categories</h3><p class="small text-secondary">Hundreds of raw labels normalized into seven readable groups.</p><div class="chart-wrap"><canvas id="homeGuidanceCategoryChart" aria-label="Guidance records by category"></canvas></div></div></article></div>
+      </div>
+      {% if crop_health.focus_crops %}<div class="data-trust-strip mt-4"><strong>Quick coverage:</strong>{% for item in crop_health.focus_crops %}<span>{{ item.name }} · {{ item.disease_count }} disease{{ item.disease_count|pluralize }}</span>{% endfor %}</div>{% endif %}
+      <div class="alert alert-warning mt-4 mb-0"><strong>Reference material, not a diagnosis.</strong> The dataset has no supplied author, license, jurisdiction, or upstream citations. Verify chemical products, rates, intervals, and local approval with a qualified agriculturalist and the current product label.</div>
+    {% else %}
+      <div class="empty-state mt-4"><h3>Crop-health data is ready to import</h3><p>Run <code>python manage.py import_crop_diseases fixtures/crop_disease_treatment.csv</code>, or use the development demo seeder.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="py-5 bg-white" id="resources" aria-labelledby="resources-heading">
+  <div class="container">
+    <div class="row align-items-end g-3">
+      <div class="col-lg-7">
+        <span class="eyebrow">Open to everyone</span>
+        <h2 class="display-6 fw-bold mt-2" id="resources-heading">Learn, verify, and get help</h2>
+      </div>
+      <div class="col-lg-5"><p class="mb-0">These public resources are available without an account, so guidance and source details stay easy to find while you work.</p></div>
+    </div>
+    <div class="row row-cols-1 row-cols-md-3 g-4 mt-3">
+      <div class="col">
+        <a class="feature-card h-100" href="{% url 'learning:list' %}">
+          <span class="feature-icon"><i data-lucide="book-open"></i></span>
+          <h3>Learning Center</h3>
+          <p>Read practical crop, soil, irrigation, and disease-prevention guides.</p>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+        </a>
+      </div>
+      <div class="col">
+        <a class="feature-card h-100" href="{% url 'core:help' %}">
+          <span class="feature-icon"><i data-lucide="circle-help"></i></span>
+          <h3>Help &amp; Support</h3>
+          <p>Find common answers or send a question to the platform team.</p>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+        </a>
+      </div>
+      <div class="col">
+        <a class="feature-card h-100" href="{% url 'agricultural_data:data_sources' %}">
+          <span class="feature-icon"><i data-lucide="database"></i></span>
+          <h3>Data Sources</h3>
+          <p>Review providers, update dates, geographic coverage, and known limits.</p>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="nasa-news" aria-labelledby="nasa-news-heading">
+  <div class="container">
+    <div class="row align-items-end g-3">
+      <div class="col-lg-7"><span class="eyebrow">NASA agriculture updates</span><h2 class="display-6 fw-bold mt-2" id="nasa-news-heading">News from Earth observation</h2></div>
+      <div class="col-lg-5"><p class="mb-0">Curated links to dated NASA articles. These are external reference stories, not live alerts or endorsements of this application.</p></div>
+    </div>
+    <div class="row row-cols-1 row-cols-lg-3 g-4 mt-3">
+      {% for article in nasa_agriculture_news %}
+        <div class="col">
+          <article class="app-card h-100 d-flex flex-column">
+            <div class="small-meta"><span>{{ article.source }}</span><span>{{ article.date }}</span></div>
+            <h3 class="h4 mt-3">{{ article.title }}</h3>
+            <p>{{ article.summary }}</p>
+            <a class="btn btn-outline-success mt-auto align-self-start" href="{{ article.url }}" target="_blank" rel="noopener noreferrer">Read at NASA <span aria-hidden="true">&nearr;</span></a>
+          </article>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="small text-secondary mt-3 mb-0">News links reviewed 8 November 2026. See <a href="{% url 'agricultural_data:data_sources' %}">Data Sources</a> for operational-data status and limitations.</p>
   </div>
 </section>
 
@@ -67,14 +156,31 @@
       <div class="col"><article class="step-card"><strong>01</strong><h3>Observe</h3><p>Bring weather and agricultural data together.</p></article></div>
       <div class="col"><article class="step-card"><strong>02</strong><h3>Understand</h3><p>Clean, aggregate, and explain gaps.</p></article></div>
       <div class="col"><article class="step-card"><strong>03</strong><h3>Compare</h3><p>Explore years, seasons, and scenarios.</p></article></div>
-      <div class="col"><article class="step-card"><strong>04</strong><h3>Decide</h3><p>Save a plan or ask a verified expert.</p></article></div>
+      <div class="col"><article class="step-card"><strong>04</strong><h3>Decide</h3><p>Save a plan or ask an agriculturalist.</p></article></div>
     </div>
   </div>
 </section>
 {{ history_chart|json_script:"home-history-data" }}
+{{ crop_health.crop_chart|json_script:"home-crop-disease-data" }}
+{{ crop_health.category_chart|json_script:"home-guidance-category-data" }}
 {% endblock %}
 {% block extra_js %}
 <script>
 (() => { const node = document.getElementById('home-history-data'); const canvas = document.getElementById('homeRainfallChart'); if (!node || !canvas || !window.Chart) return; const d = JSON.parse(node.textContent); new Chart(canvas, {type:'bar',data:{labels:d.years,datasets:[{label:'Rainfall (mm)',data:d.rainfall,backgroundColor:'#20734D',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'mm'}},x:{grid:{display:false}}}}}); })();
+(() => {
+  if (!window.Chart) return;
+  const cropNode = document.getElementById('home-crop-disease-data');
+  const cropCanvas = document.getElementById('homeCropDiseaseChart');
+  if (cropNode && cropCanvas) {
+    const data = JSON.parse(cropNode.textContent);
+    new Chart(cropCanvas, {type:'bar',data:{labels:data.labels,datasets:[{label:'Distinct diseases',data:data.values,backgroundColor:'#20734D',borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+  }
+  const categoryNode = document.getElementById('home-guidance-category-data');
+  const categoryCanvas = document.getElementById('homeGuidanceCategoryChart');
+  if (categoryNode && categoryCanvas) {
+    const data = JSON.parse(categoryNode.textContent);
+    new Chart(categoryCanvas, {type:'doughnut',data:{labels:data.labels,datasets:[{data:data.values,backgroundColor:['#20734D','#3F8F68','#D69E2E','#3973A8','#8B5FA8','#75A843','#84929C']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  }
+})();
 </script>
 {% endblock %}

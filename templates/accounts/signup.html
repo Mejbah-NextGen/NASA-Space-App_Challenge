@@ -6,10 +6,10 @@
     <div class="auth-visual-copy">
       <span class="section-kicker">Start with evidence</span>
       <h1>Start with your field. Grow with better context.</h1>
-      <p>Farmers can begin immediately. Agriculturalists submit their professional details for platform-admin verification before providing expert services.</p>
+      <p>Farmers and agriculturalists can begin immediately, connect directly, and collaborate around a farmer-controlled consultation.</p>
       <div class="two-grid" style="margin-top:2rem">
         <div class="app-card" style="background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)"><h2 style="color:#fff;font-size:1.05rem">Farmer</h2><p style="color:#c5d8ce">Save farms, simulations, decisions, and expert conversations.</p></div>
-        <div class="app-card" style="background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)"><h2 style="color:#fff;font-size:1.05rem">Agriculturalist</h2><p style="color:#c5d8ce">Support assigned farmers after credential review and approval.</p></div>
+        <div class="app-card" style="background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.15)"><h2 style="color:#fff;font-size:1.05rem">Agriculturalist</h2><p style="color:#c5d8ce">Join the directory, receive farmer questions, and share clearly labeled guidance.</p></div>
       </div>
     </div>
   </div>
@@ -17,7 +17,7 @@
     <div class="auth-card">
       <span class="eyebrow">Create your account</span>
       <h1>Choose how you’ll use the platform</h1>
-      <p>Admins are provisioned securely and cannot register here.</p>
+      <p>Choose Farmer or Agriculturalist. Credential review is shown as an optional trust badge and does not block collaboration.</p>
       <form method="post" novalidate>
         {% csrf_token %}{{ form.non_field_errors }}
         {% for field in form %}

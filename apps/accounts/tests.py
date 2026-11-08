@@ -180,10 +180,6 @@ class AuthenticationWorkflowTests(TestCase):
         ]
         for index, (role, destination) in enumerate(cases):
             user = self.make_user(f"role-{index}@example.com", role)
-            if role == User.Role.AGRICULTURALIST:
-                profile = user.agriculturalist_profile
-                profile.is_approved = True
-                profile.save(update_fields=["is_approved"])
             self.client.force_login(user)
             self.assertRedirects(self.client.get(reverse("accounts:post_login")), reverse(destination))
             self.client.logout()
@@ -208,6 +204,9 @@ class AuthenticationWorkflowTests(TestCase):
                 "district": "Dhaka",
                 "upazila": "",
                 "role": User.Role.ADMIN,
+                "experience": user.farmer_profile.experience,
+                "preferred_area_unit": user.farmer_profile.preferred_area_unit,
+                "bio": user.farmer_profile.bio,
             },
         )
         user.refresh_from_db()
@@ -225,6 +224,9 @@ class AuthenticationWorkflowTests(TestCase):
                 "phone_number": "",
                 "district": "Dhaka",
                 "upazila": "",
+                "experience": user.farmer_profile.experience,
+                "preferred_area_unit": user.farmer_profile.preferred_area_unit,
+                "bio": user.farmer_profile.bio,
             },
         )
 
@@ -254,6 +256,9 @@ class AuthenticationWorkflowTests(TestCase):
                 "phone_number": "",
                 "district": "Dhaka",
                 "upazila": "",
+                "experience": user.farmer_profile.experience,
+                "preferred_area_unit": user.farmer_profile.preferred_area_unit,
+                "bio": user.farmer_profile.bio,
             },
         )
 
@@ -275,20 +280,23 @@ class AuthenticationWorkflowTests(TestCase):
                 "phone_number": "",
                 "district": "Rangpur",
                 "upazila": "",
+                "experience": user.farmer_profile.experience,
+                "preferred_area_unit": user.farmer_profile.preferred_area_unit,
+                "bio": user.farmer_profile.bio,
             },
         )
         user.refresh_from_db()
         self.assertTrue(user.is_verified)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_pending_agriculturalist_cannot_open_expert_dashboard(self):
+    def test_unreviewed_agriculturalist_can_open_workspace(self):
         user = self.make_user("pending@example.com", User.Role.AGRICULTURALIST)
         self.assertFalse(AgriculturalistProfile.objects.get(user=user).is_approved)
         self.client.force_login(user)
-        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 200)
 
     @override_settings(EMAIL_VERIFICATION_ENABLED=False)
-    def test_agriculturalist_signup_bypasses_email_but_still_requires_professional_approval(self):
+    def test_agriculturalist_signup_is_immediately_usable_with_review_status_disclosed(self):
         response = self.client.post(
             reverse("accounts:signup"),
             {
@@ -318,7 +326,11 @@ class AuthenticationWorkflowTests(TestCase):
         )
         self.assertEqual(len(mail.outbox), 0)
         self.client.force_login(user)
-        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("dashboard:agriculturalist_dashboard")).status_code, 200)
+        self.assertRedirects(
+            self.client.get(reverse("accounts:post_login")),
+            reverse("dashboard:agriculturalist_dashboard"),
+        )
 
     @override_settings(TRUST_X_FORWARDED_FOR=False)
     def test_login_throttle_ignores_untrusted_forwarded_for(self):
@@ -380,6 +392,57 @@ class AuthenticationWorkflowTests(TestCase):
         self.assertNotContains(dashboard, "/media/profiles/2026/11/avatar.png")
         missing_file = self.client.get(reverse("accounts:profile_image"))
         self.assertEqual(missing_file.status_code, 404)
+
+    def test_farmer_can_complete_role_specific_profile_fields(self):
+        user = self.make_user("profile-farmer@example.com", User.Role.FARMER)
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("accounts:profile"),
+            {
+                "full_name": "Profile Farmer",
+                "email": user.email,
+                "phone_number": "+880 1700-100001",
+                "district": "Rangpur",
+                "upazila": "Kaunia",
+                "experience": "6_10",
+                "preferred_area_unit": "BIGHA",
+                "bio": "Grows rice and maize and wants collaborative crop-health guidance.",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:profile"))
+        user.refresh_from_db()
+        user.farmer_profile.refresh_from_db()
+        self.assertEqual(user.phone_number, "+880 1700-100001")
+        self.assertEqual(user.farmer_profile.experience, "6_10")
+        self.assertEqual(user.farmer_profile.preferred_area_unit, "BIGHA")
+        self.assertIn("crop-health", user.farmer_profile.bio)
+
+    def test_agriculturalist_can_complete_professional_profile_fields(self):
+        user = self.make_user("profile-agriculturalist@example.com", User.Role.AGRICULTURALIST)
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("accounts:profile"),
+            {
+                "full_name": "Profile Agriculturalist",
+                "email": user.email,
+                "phone_number": "+880 1700-100002",
+                "district": "Kurigram",
+                "upazila": "Ulipur",
+                "specialization": "Rice disease and irrigation",
+                "qualifications": "Demonstration agronomy profile",
+                "organization": "Community Farm Lab",
+                "license_number": "DEMO-PROFILE-01",
+                "years_experience": "6",
+                "bio": "Supports farmer-led diagnosis and evidence-aware decisions.",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:profile"))
+        user.refresh_from_db()
+        user.agriculturalist_profile.refresh_from_db()
+        self.assertEqual(user.agriculturalist_profile.specialization, "Rice disease and irrigation")
+        self.assertEqual(user.agriculturalist_profile.years_experience, 6)
+        self.assertEqual(user.agriculturalist_profile.organization, "Community Farm Lab")
+        self.assertFalse(user.agriculturalist_profile.is_approved)
 
 
 class ProductionProxySettingsTests(SimpleTestCase):

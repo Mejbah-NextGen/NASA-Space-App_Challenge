@@ -1,6 +1,8 @@
+import hashlib
+import os
 from datetime import date, timedelta
 from decimal import Decimal
-import os
+from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -17,6 +19,7 @@ from apps.administration.models import AuditLog
 from apps.agricultural_data.models import (
     AgriculturalDataset,
     DataSource,
+    DiseaseGuidance,
     HistoricalCropObservation,
     HistoricalWeatherObservation,
     Region,
@@ -54,7 +57,9 @@ class Command(BaseCommand):
                 "admin@farmtime.test",
                 "System Admin",
                 User.Role.ADMIN,
+                phone_number="+880 1700-000001",
                 district="Dhaka",
+                upazila="Tejgaon",
                 is_staff=True,
                 is_superuser=True,
             )
@@ -62,7 +67,9 @@ class Command(BaseCommand):
                 "operations.admin@farmtime.test",
                 "Nadia Islam",
                 User.Role.ADMIN,
+                phone_number="+880 1700-000002",
                 district="Dhaka",
+                upazila="Dhanmondi",
                 is_staff=True,
                 is_superuser=False,
             )
@@ -70,18 +77,23 @@ class Command(BaseCommand):
                 "agriculturalist@farmtime.test",
                 "Dr. Ayesha Rahman",
                 User.Role.AGRICULTURALIST,
+                phone_number="+880 1700-000003",
                 district="Kurigram",
+                upazila="Ulipur",
             )
             soil_expert = self._user(
                 "soil.expert@farmtime.test",
                 "Dr. Farhana Akter",
                 User.Role.AGRICULTURALIST,
+                phone_number="+880 1700-000004",
                 district="Rangpur",
+                upazila="Kaunia",
             )
             farmer = self._user(
                 "farmer@farmtime.test",
                 "Rahim Mia",
                 User.Role.FARMER,
+                phone_number="+880 1700-000005",
                 district="Kurigram",
                 upazila="Ulipur",
             )
@@ -89,13 +101,18 @@ class Command(BaseCommand):
                 "salma.farmer@farmtime.test",
                 "Salma Begum",
                 User.Role.FARMER,
+                phone_number="+880 1700-000006",
                 district="Rangpur",
                 upazila="Kaunia",
             )
 
             FarmerProfile.objects.update_or_create(
                 user=farmer,
-                defaults={"experience": FarmerProfile.Experience.SIX_TO_TEN, "preferred_area_unit": "ACRE"},
+                defaults={
+                    "experience": FarmerProfile.Experience.SIX_TO_TEN,
+                    "preferred_area_unit": "ACRE",
+                    "bio": "Demonstration rice and maize grower exploring weather history, crop health, and collaborative farm planning.",
+                },
             )
             FarmerProfile.objects.update_or_create(
                 user=salma,
@@ -123,7 +140,7 @@ class Command(BaseCommand):
                 defaults={
                     "status": AgriculturalistVerification.Status.APPROVED,
                     "reviewer": admin_user,
-                    "notes": "Approved demonstration profile. Not a real professional credential.",
+                    "notes": "Demonstration credential-review badge. Not a real professional credential.",
                     "reviewed_at": timezone.now(),
                 },
             )
@@ -145,7 +162,7 @@ class Command(BaseCommand):
                 defaults={
                     "status": AgriculturalistVerification.Status.APPROVED,
                     "reviewer": operations_admin,
-                    "notes": "Approved demonstration profile. Not a real professional credential.",
+                    "notes": "Demonstration credential-review badge. Not a real professional credential.",
                     "reviewed_at": timezone.now(),
                 },
             )
@@ -175,6 +192,63 @@ class Command(BaseCommand):
                     "last_updated_at": timezone.now(),
                 },
             )
+            reference_sources = [
+                {
+                    "name": "NASA POWER Agroclimatology",
+                    "provider": "NASA Langley Research Center",
+                    "kind": DataSource.Kind.WEATHER,
+                    "url": "https://power.larc.nasa.gov/",
+                    "description": "Global solar, meteorological, and hydrological analysis-ready data for agricultural applications.",
+                    "attribution": "NASA Prediction Of Worldwide Energy Resources (POWER)",
+                    "geographic_coverage": "Global point and regional products",
+                    "update_frequency": "Varies by temporal product",
+                    "limitations": "Reference source only in this demo; no NASA POWER observations are imported automatically.",
+                },
+                {
+                    "name": "NASA SMAP Soil Moisture",
+                    "provider": "NASA Jet Propulsion Laboratory",
+                    "kind": DataSource.Kind.SATELLITE,
+                    "url": "https://science.nasa.gov/mission/smap/",
+                    "description": "Satellite observations used to study global soil moisture and freeze-thaw state.",
+                    "attribution": "NASA Soil Moisture Active Passive (SMAP) mission",
+                    "geographic_coverage": "Global",
+                    "update_frequency": "Mission product dependent",
+                    "limitations": "Reference source only; spatial resolution is not a substitute for field measurements.",
+                },
+                {
+                    "name": "Landsat Agriculture and Food Security",
+                    "provider": "NASA and U.S. Geological Survey",
+                    "kind": DataSource.Kind.SATELLITE,
+                    "url": "https://science.nasa.gov/mission/landsat/benefits/agriculture-food-security/",
+                    "description": "Long-running Earth imagery used for crop condition, land cover, water-use, and food-security research.",
+                    "attribution": "NASA/USGS Landsat program",
+                    "geographic_coverage": "Global land surface",
+                    "update_frequency": "Mission and product dependent",
+                    "limitations": "Reference source only; cloud cover, revisit time, and resolution affect local interpretation.",
+                },
+                {
+                    "name": "NASA Space Apps Farm Navigators Challenge",
+                    "provider": "NASA International Space Apps Challenge",
+                    "kind": DataSource.Kind.MANUAL,
+                    "url": "https://www.spaceappschallenge.org/2025/challenges/nasa-farm-navigators-using-nasa-data-exploration-in-agriculture/",
+                    "description": "Challenge material that inspired accessible exploration of NASA data for agricultural decision support.",
+                    "attribution": "NASA International Space Apps Challenge",
+                    "geographic_coverage": "Global learning and innovation context",
+                    "update_frequency": "Annual challenge archive",
+                    "limitations": "Design and learning reference; it is not an operational farm dataset.",
+                },
+            ]
+            for source_defaults in reference_sources:
+                source_name = source_defaults.pop("name")
+                DataSource.objects.update_or_create(
+                    name=source_name,
+                    defaults={
+                        **source_defaults,
+                        "is_active": True,
+                        "is_demo": False,
+                        "last_updated_at": timezone.now(),
+                    },
+                )
             dataset, _ = AgriculturalDataset.objects.update_or_create(
                 slug="kurigram-demonstration-history-2016-2025",
                 defaults={
@@ -613,6 +687,30 @@ class Command(BaseCommand):
                     "staff_response": "",
                 },
             )
+            disease_fixture = Path(settings.BASE_DIR) / "fixtures" / "crop_disease_treatment.csv"
+            disease_dataset = AgriculturalDataset.objects.filter(
+                slug="crop-disease-guidance-reference"
+            ).first()
+            disease_library_complete = False
+            if disease_fixture.is_file() and disease_dataset:
+                fixture_hash = hashlib.sha256(disease_fixture.read_bytes()).hexdigest().upper()
+                metadata = disease_dataset.metadata or {}
+                expected_pairs = metadata.get("crop_disease_pairs")
+                expected_guidance = metadata.get("unique_guidance_rows")
+                disease_library_complete = bool(
+                    metadata.get("sha256") == fixture_hash
+                    and expected_pairs
+                    and expected_guidance
+                    and disease_dataset.crop_diseases.count() == expected_pairs
+                    and DiseaseGuidance.objects.filter(disease__dataset=disease_dataset).count()
+                    == expected_guidance
+                )
+            if disease_fixture.is_file() and not disease_library_complete:
+                from apps.agricultural_data.management.commands.import_crop_diseases import (
+                    import_crop_disease_file,
+                )
+
+                import_crop_disease_file(disease_fixture)
             self._notification(farmer, Notification.Kind.EXPERT_REPLIED, "Agriculturalist replied", "Your irrigation consultation has a new response.", f"/farmer/consultations/{consultation.pk}/")
             self._notification(expert, Notification.Kind.CONSULTATION_ASSIGNED, "Consultation assigned", "Rahim Mia shared a demonstration consultation.", f"/agriculturalist/questions/{consultation.pk}/")
             self._notification(admin_user, Notification.Kind.SYSTEM, "Demo data ready", "Local demonstration records were refreshed.", "/platform-admin/dashboard/")

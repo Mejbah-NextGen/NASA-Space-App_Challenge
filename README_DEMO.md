@@ -38,7 +38,7 @@ Every account uses the development-only password **FarmDemo@2026!**.
 | Farmer | Rahim Mia | farmer@farmtime.test | Rice farm, irrigation scenario, decision, and consultation |
 | Farmer | Salma Begum | salma.farmer@farmtime.test | Tomato farm, drip-irrigation scenario, tasks, and consultation |
 
-Both agriculturalist accounts are email-verified and locally approved. The main admin is a superuser; the operations admin uses the project's custom platform-admin workspace without Django superuser privileges.
+Both Agriculturalist accounts carry a demonstration-only credential-review badge. Review is informational; any active Agriculturalist can use the workspace and collaborate on an assigned case. The main admin is a superuser; the operations admin uses the project's custom platform-admin workspace without Django superuser privileges.
 
 ## Seeded demonstration data
 
@@ -48,9 +48,11 @@ Running **python manage.py seed_demo** creates or refreshes:
 - Saved rice and tomato simulations with calculated rule-based results.
 - Farming decisions and recorded outcomes linked to those simulations.
 - Two active consultations with assignments, consented farm context, messages, and published recommendations.
-- Two approved agriculturalist profiles and verification records.
+- Two Agriculturalist profiles with demonstration credential-review records.
 - Two published learning articles.
 - Synthetic historical crop and weather observations for charts.
+- The bundled contributor crop-disease library: 42 crops, 858 crop/disease pairs, and 3,047 unique guidance records.
+- NASA POWER, SMAP, Landsat, and Space Apps reference-source cards (no NASA measurements are imported by the seed command).
 - A seven-day demonstration forecast and a clearly labeled weather alert.
 - Support tickets, user notifications, and an admin audit event.
 
@@ -83,7 +85,7 @@ All sample weather, historical, professional, and advisory information is explic
 ### Admin
 
 1. Sign in as either admin account.
-2. Review users, agriculturalist verification, farms, data sources, datasets, and weather alerts.
+2. Review users, optional Agriculturalist credential badges, farms, data sources, datasets, and weather alerts.
 3. Inspect the two support tickets and the audit log.
 4. Use the custom platform-admin tools without changing the synthetic-data labeling.
 

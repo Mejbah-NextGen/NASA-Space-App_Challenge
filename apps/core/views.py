@@ -1,16 +1,103 @@
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
-from django.db.models import Avg, Q, Sum
+from django.db.models import Avg, Count, Sum
 from django.db.models.functions import ExtractYear
 from django.shortcuts import redirect
 from django.views.generic import FormView, TemplateView
 
-from apps.agricultural_data.models import AgriculturalDataset, DataSource, HistoricalWeatherObservation
-from apps.agricultural_data.views import DEMO_RAINFALL, DEMO_YEARS
+from apps.agricultural_data.models import (
+    AgriculturalDataset,
+    CropDisease,
+    DataSource,
+    DiseaseGuidance,
+    HistoricalWeatherObservation,
+)
+from apps.agricultural_data.views import DEMO_RAINFALL, DEMO_YEARS, _public_series
 from apps.weather.services import available_districts, get_weather
 
 from .forms import SupportTicketForm
+
+
+NASA_AGRICULTURE_NEWS = (
+    {
+        "date": "8 September 2026",
+        "source": "NASA Landsat",
+        "title": "Separating wheat from chaff — from space",
+        "summary": "Researchers use harmonized Landsat and Sentinel-2 observations to distinguish winter cover crops from wheat and other vegetation.",
+        "url": "https://science.nasa.gov/mission/landsat/separating-wheat-from-chaff-from-space/",
+    },
+    {
+        "date": "29 August 2025",
+        "source": "NASA Science",
+        "title": "Mapping plant productivity with satellite data",
+        "summary": "A NASA research update explores new global views of plant productivity and the data behind vegetation monitoring.",
+        "url": "https://science.nasa.gov/blogs/science-news/2025/08/29/nasa-scientists-map-plant-productivity-with-data-from-ocean-satellite/",
+    },
+    {
+        "date": "12 March 2025",
+        "source": "NASA JPL",
+        "title": "NISAR will map farmland from planting to harvest",
+        "summary": "The NASA-ISRO radar mission is designed to track crop growth, plant water content, and soil moisture through cloudy and rainy conditions.",
+        "url": "https://www.jpl.nasa.gov/news/nasa-isro-mission-will-map-farmland-from-planting-to-harvest/",
+    },
+)
+
+
+def _home_crop_health_context():
+    public_statuses = [AgriculturalDataset.Status.VERIFIED, AgriculturalDataset.Status.SAMPLE]
+    diseases = CropDisease.objects.filter(
+        dataset__status__in=public_statuses,
+        dataset__source__is_active=True,
+    )
+    guidance = DiseaseGuidance.objects.filter(disease__in=diseases)
+    top_crops = list(
+        diseases.order_by()
+        .values("crop_name")
+        .annotate(disease_count=Count("id", distinct=True))
+        .order_by("-disease_count", "crop_name")[:8]
+    )
+    category_counts = {
+        row["category"]: row["count"]
+        for row in guidance.order_by().values("category").annotate(count=Count("id"))
+    }
+    focus_crops = ("Rice", "Maize", "Tomato", "Potato", "Mango", "Brinjal")
+    focus_counts = {
+        row["crop_name"]: row["disease_count"]
+        for row in (
+            diseases.filter(crop_name__in=focus_crops)
+            .order_by()
+            .values("crop_name")
+            .annotate(disease_count=Count("id", distinct=True))
+        )
+    }
+    dataset = (
+        AgriculturalDataset.objects.filter(crop_diseases__in=diseases)
+        .select_related("source")
+        .distinct()
+        .order_by("-updated_at")
+        .first()
+    )
+    return {
+        "available": guidance.exists(),
+        "crop_count": diseases.order_by().values("crop_name").distinct().count(),
+        "disease_count": diseases.count(),
+        "guidance_count": guidance.count(),
+        "dataset": dataset,
+        "focus_crops": [
+            {"name": crop, "disease_count": focus_counts[crop]}
+            for crop in focus_crops
+            if crop in focus_counts
+        ],
+        "crop_chart": {
+            "labels": [row["crop_name"] for row in top_crops],
+            "values": [row["disease_count"] for row in top_crops],
+        },
+        "category_chart": {
+            "labels": [label for value, label in DiseaseGuidance.Category.choices],
+            "values": [category_counts.get(value, 0) for value, label in DiseaseGuidance.Category.choices],
+        },
+    }
 
 
 def _support_request_allowed(request):
@@ -38,10 +125,11 @@ class HomeView(TemplateView):
         context = super().get_context_data(**kwargs)
         district = self.request.GET.get("district", "Kurigram")
         weather = get_weather(district)
-        observations = HistoricalWeatherObservation.objects.filter(
+        observation_candidates = HistoricalWeatherObservation.objects.filter(
             region__district__iexact=weather["district"],
             dataset__status__in=[AgriculturalDataset.Status.VERIFIED, AgriculturalDataset.Status.SAMPLE],
         )
+        observations, history_is_demo = _public_series(observation_candidates)
         annual = list(
             observations
             .annotate(year=ExtractYear("observed_on"))
@@ -54,9 +142,6 @@ class HomeView(TemplateView):
                 "years": [row["year"] for row in annual],
                 "rainfall": [float(row["rainfall"] or 0) for row in annual],
             }
-            history_is_demo = observations.filter(
-                Q(dataset__status=AgriculturalDataset.Status.SAMPLE) | Q(dataset__source__is_demo=True)
-            ).exists()
         else:
             chart = {"years": DEMO_YEARS, "rainfall": DEMO_RAINFALL}
             history_is_demo = True
@@ -67,6 +152,8 @@ class HomeView(TemplateView):
                 "history_chart": chart,
                 "history_is_demo": history_is_demo,
                 "featured_sources": DataSource.objects.filter(is_active=True)[:3],
+                "nasa_agriculture_news": NASA_AGRICULTURE_NEWS,
+                "crop_health": _home_crop_health_context(),
             }
         )
         return context

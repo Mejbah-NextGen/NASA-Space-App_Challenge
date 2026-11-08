@@ -1,21 +1,21 @@
-* [ ] 
+* [ ]
 
 # Farm Time Machine
 
-Farm Time Machine is a public-first, role-based agricultural decision-support platform built with Django. Visitors can explore clearly sourced weather and historical agricultural information without an account. Farmers can manage farms, compare deterministic scenarios, record decisions, and consult verified Agriculturalists. Agriculturalists work only with assigned and consented cases. Platform Admins manage accounts, expert verification, content, data provenance, and audit records.
+Farm Time Machine is a public-first, role-based agricultural decision-support platform built with Django. Visitors can explore clearly sourced weather, historical agriculture, and the crop-health reference library without an account. Farmers can manage farms, compare deterministic scenarios, record decisions, and collaborate with Agriculturalists. Agriculturalists work only with assigned and consented cases. Platform Admins manage accounts, optional credential-review badges, content, data provenance, and audit records.
 
 The application is designed for Bangladesh-focused demonstration workflows. It distinguishes live, verified, unavailable, and demonstration data throughout the interface. It does not claim to predict yields or replace qualified local agricultural advice.
 
 ## Main capabilities
 
-- Public home, current weather, seven-day forecast, agricultural history, crop insights, methodology, data sources, and learning content.
+- Public home, current weather, seven-day forecast, agricultural history, crop insights, searchable crop-disease guidance, NASA agriculture news links, methodology, data sources, and learning content.
 - Email-based custom user model with Farmer, Agriculturalist, and Admin roles.
 - Farmer farm/field/crop/activity/task management with ownership protection.
 - Transparent rule-based Farm Simulator with saved scenarios and comparisons.
 - Searchable decision timeline with recorded real outcomes.
-- Verified-expert directory, assigned consultations, threaded replies, recommendations, and revocable farm-data consent.
+- Open Agriculturalist directory with credential-review badges, assigned consultations, threaded replies, recommendations, and revocable farm-data consent.
 - Agriculturalist case dashboard, assigned farmers, recommendations, questions, and learning-author workflow.
-- Custom platform Admin dashboard for users, expert approval, datasets, CSV validation, farms, reports, content, weather, settings status, support, and audit logs.
+- Custom platform Admin dashboard for users, optional Agriculturalist credential review, datasets, CSV validation, farms, reports, content, weather, settings status, support, and audit logs.
 - Server-side weather integration with timeout, cache, provider attribution, and explicit fallback states.
 - Server-side AI provider integration with request limits, conversation history, and an honest built-in fallback when no provider is configured.
 - Database-backed notifications and support tickets.
@@ -103,36 +103,36 @@ The following accounts are created only by the guarded `seed_demo` command:
 | Farmer          | `farmer@farmtime.test`           | `FarmDemo@2026!` |
 | Farmer          | `salma.farmer@farmtime.test`     | `FarmDemo@2026!` |
 
-`seed_demo` refuses to run unless the explicit development settings module is active with `DEBUG=True` and `DEMO_MODE=True`. It is idempotent and never runs during deployment. The password above is public development data; never reuse it for a real account.
+`seed_demo` refuses to run unless the explicit development settings module is active with `DEBUG=True` and `DEMO_MODE=True`. It is idempotent, imports the bundled crop-disease reference library when needed, and never runs during deployment. The password above is public development data; never reuse it for a real account.
 
-See [README_DEMO.md](README_DEMO.md) for the account personas, seeded records, and role-by-role walkthroughs.
+See [DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md) for the quick credential table and [README_DEMO.md](README_DEMO.md) for the role-by-role walkthroughs.
 
 Environment configuration
 
 Copy `.env.example` to `.env`. Important variables:
 
-| Variable                   | Purpose                                                                               |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| `DJANGO_SETTINGS_MODULE` | `config.settings.development` locally; `config.settings.production` in deployment |
-| `DJANGO_SECRET_KEY`      | Required long random production secret                                                |
-| `DJANGO_DEBUG`           | Development-only debug switch                                                         |
-| `DATABASE_URL`           | PostgreSQL connection URL; empty uses local SQLite                                    |
-| `CACHE_BACKEND`          | Shared atomic cache backend required in production                                    |
-| `CACHE_LOCATION`         | Cache/Redis connection location                                                       |
-| `EMAIL_BACKEND`          | Real delivery backend required in production                                          |
+| Variable                       | Purpose                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `DJANGO_SETTINGS_MODULE`     | `config.settings.development` locally; `config.settings.production` in deployment |
+| `DJANGO_SECRET_KEY`          | Required long random production secret                                                |
+| `DJANGO_DEBUG`               | Development-only debug switch                                                         |
+| `DATABASE_URL`               | PostgreSQL connection URL; empty uses local SQLite                                    |
+| `CACHE_BACKEND`              | Shared atomic cache backend required in production                                    |
+| `CACHE_LOCATION`             | Cache/Redis connection location                                                       |
+| `EMAIL_BACKEND`              | Real delivery backend required in production                                          |
 | `EMAIL_VERIFICATION_ENABLED` | Temporarily `false`; set `true` to restore signed-link verification enforcement   |
-| `DEMO_MODE`              | Allows clearly labeled demonstration fallbacks and demo seeding                       |
-| `WEATHER_LIVE_ENABLED`   | Enables backend Open-Meteo calls                                                      |
-| `WEATHER_API_BASE_URL`   | Fixed weather provider endpoint                                                       |
-| `AI_API_KEY`             | Optional server-side provider credential                                              |
-| `AI_API_BASE_URL`        | Optional OpenAI-compatible base URL                                                   |
-| `AI_MODEL`               | Provider model identifier                                                             |
-| `ALLOWED_HOSTS`          | Production host allowlist                                                             |
-| `CSRF_TRUSTED_ORIGINS`   | HTTPS origins allowed for CSRF                                                        |
+| `DEMO_MODE`                  | Allows clearly labeled demonstration fallbacks and demo seeding                       |
+| `WEATHER_LIVE_ENABLED`       | Enables backend Open-Meteo calls                                                      |
+| `WEATHER_API_BASE_URL`       | Fixed weather provider endpoint                                                       |
+| `AI_API_KEY`                 | Optional server-side provider credential                                              |
+| `AI_API_BASE_URL`            | Optional OpenAI-compatible base URL                                                   |
+| `AI_MODEL`                   | Provider model identifier                                                             |
+| `ALLOWED_HOSTS`              | Production host allowlist                                                             |
+| `CSRF_TRUSTED_ORIGINS`       | HTTPS origins allowed for CSRF                                                        |
 
 Never commit `.env`, API credentials, databases, or private uploaded media.
 
-Email verification is currently disabled by default, so new accounts can sign in immediately and no signup verification message is sent. Agriculturalist professional approval remains required. Migration `accounts.0002` grandfathers existing accounts, and the signed-link workflow is preserved behind `EMAIL_VERIFICATION_ENABLED=true` for the planned rollout.
+Email verification is currently disabled by default, so new accounts can sign in immediately and no signup verification message is sent. Farmer and Agriculturalist accounts are immediately usable; an Agriculturalist credential review is an optional trust badge, not an access gate. Migration `accounts.0002` preserves existing account state, and the signed-link workflow remains available behind `EMAIL_VERIFICATION_ENABLED=true`.
 
 ## Weather integration
 
@@ -185,6 +185,22 @@ python manage.py import_agricultural_data fixtures\demo_historical_weather.csv `
 
 Do not pass `--verified` for demonstration or unverified data. Platform Admins can also upload a CSV to an existing dataset from **Agricultural Data**.
 
+## Crop-disease reference import
+
+The bundled contributor dataset uses these columns:
+
+```text
+Crop,Disease,Information Type,Information
+```
+
+It is imported automatically by `seed_demo` when absent, or directly with:
+
+```powershell
+python manage.py import_crop_diseases fixtures\crop_disease_treatment.csv
+```
+
+The importer validates the file atomically, removes exact duplicates, preserves original information labels, and groups them into seven visualization categories. The resulting 3,047 unique records remain labeled sample/unverified because the supplied file has no author, license, source citations, review date, or regulatory jurisdiction. See [crop-disease data documentation](docs/crop-disease-data.md) and [source register](SOURCES.md).
+
 ## Tests and verification
 
 Run the standard project checks:
@@ -231,13 +247,16 @@ Do not run `seed_demo` in production. Do not expose the default demo password. S
 - Farmer navigation becomes three columns on tablets and two columns below 768 px.
 - Profile menus provide Profile, Settings, Security, Notifications, and POST logout.
 - Backend mixins and object-filtered querysets enforce role and ownership permissions.
-- Agriculturalists need approval and an assignment/consent before accessing farmer context.
+- Any active Agriculturalist can use the workspace; only assigned cases and explicitly consented farm context are accessible.
 - Rule-based simulation results are illustrations, not scientific forecasts or confidence scores.
 - Every public data experience carries source, location, unit, freshness, and sample/verified state where applicable.
 
 Additional documentation:
 
 - [Demo guide](README_DEMO.md)
+- [Demo account quick reference](DEMO_ACCOUNTS.md)
+- [Source register](SOURCES.md)
+- [Crop-disease data](docs/crop-disease-data.md)
 - [Architecture](docs/architecture.md)
 - [Database](docs/database.md)
 - [Roles and permissions](docs/roles-permissions.md)

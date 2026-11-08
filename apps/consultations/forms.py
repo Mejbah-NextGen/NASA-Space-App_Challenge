@@ -26,7 +26,6 @@ class ConsultationCreateForm(forms.ModelForm):
         experts = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
             is_active=True,
-            agriculturalist_profile__is_approved=True,
         )
         self.fields["agriculturalist"].queryset = restrict_to_email_verified(experts).select_related(
             "agriculturalist_profile"

@@ -42,7 +42,6 @@ class AgriculturalistRequiredMixin(RoleRequiredMixin):
             super().test_func()
             and user_has_verified_email(user)
             and hasattr(user, "agriculturalist_profile")
-            and user.agriculturalist_profile.is_approved
         )
 
 

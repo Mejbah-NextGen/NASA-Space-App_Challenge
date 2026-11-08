@@ -1,6 +1,6 @@
 {% extends "dashboard/base_dashboard.html" %}
 {% block title %}{{ farm.name }}{% endblock %}
-{% block dashboard_content %}
+{% block content %}
 <div class="page-heading">
   <div><span class="eyebrow">{{ farm.district }}{% if farm.upazila %} · {{ farm.upazila }}{% endif %}</span><h1>{{ farm.name }}</h1><p>{{ farm.land_area }} {{ farm.get_area_unit_display }} · {{ farm.get_soil_type_display }} · {{ farm.get_irrigation_type_display }}</p></div>
   <div class="button-row"><a class="btn btn-secondary" href="{% url 'farms:farm_update' farm.pk %}">Edit farm</a><a class="btn btn-primary" href="{% url 'farms:field_create' farm.pk %}">+ Add field</a></div>

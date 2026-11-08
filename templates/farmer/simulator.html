@@ -1,6 +1,6 @@
 {% extends "dashboard/base_dashboard.html" %}
 {% block title %}Farm Simulator{% endblock %}
-{% block dashboard_content %}
+{% block content %}
 <div class="page-heading"><div><span class="eyebrow">What-if simulator</span><h1>Explore a farm scenario</h1><p>Hold assumptions constant and compare crop tolerance with a transparent, deterministic baseline.</p></div><a class="btn btn-secondary" href="{% url 'simulations:history' %}">Previous results</a></div>
 <div class="two-column-layout simulator-layout">
   <form class="card form-card" method="post" novalidate>{% csrf_token %}<div class="notice notice-warning"><strong>Illustrative model</strong><p>This calculation is not an agronomic forecast or yield guarantee. Verify important decisions with a qualified agriculturalist.</p></div>{{ form.as_p }}<div class="form-actions"><button class="btn btn-primary" type="submit">Run & save simulation</button><a class="btn btn-secondary" href="{% url 'simulations:simulator' %}">Reset</a></div></form>

@@ -148,7 +148,7 @@ class CropCatalogToggleForm(forms.Form):
 
 class ExpertAssignmentForm(forms.Form):
     consultation = forms.ModelChoiceField(queryset=Consultation.objects.none())
-    agriculturalist = forms.ModelChoiceField(queryset=User.objects.none(), label="Approved Agriculturalist")
+    agriculturalist = forms.ModelChoiceField(queryset=User.objects.none(), label="Agriculturalist")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -157,7 +157,6 @@ class ExpertAssignmentForm(forms.Form):
         ).select_related("farmer", "farm").order_by("-updated_at")
         experts = User.objects.filter(
             role=User.Role.AGRICULTURALIST,
-            agriculturalist_profile__is_approved=True,
             is_active=True,
         )
         self.fields["agriculturalist"].queryset = restrict_to_email_verified(experts).order_by("full_name")

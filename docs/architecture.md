@@ -56,7 +56,7 @@ Business logic that should be reused or tested independently lives outside views
 - Roles are server-owned model fields and never editable through public profile forms.
 - Role mixins deny cross-workspace access with HTTP 403.
 - Owner-sensitive views filter their queryset by the signed-in user before object lookup, producing a privacy-preserving 404 for another user’s object.
-- Agriculturalist workflows require an approved profile and assigned consultation. Farm details require active consent.
+- Any active Agriculturalist can use the workspace and accept an assigned consultation. Credential review is an informational badge; private Farm details still require matching, active Farmer consent.
 - All state changes use POST and CSRF protection.
 - Uploads are constrained by size, extension/type, and domain validation.
 - Login and AI endpoints use cache-backed request limits.

@@ -1,7 +1,8 @@
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from apps.accounts.models import AgriculturalistProfile, User
+from apps.accounts.models import AgriculturalistProfile, FarmerProfile, User
+from apps.agricultural_data.models import CropDisease, DataSource, DiseaseGuidance
 from apps.consultations.models import Consultation, ExpertAssignment, FarmDataConsent
 from apps.farms.models import Farm, FarmTask
 from apps.notifications.models import Notification
@@ -31,7 +32,10 @@ class SeedDemoCommandTests(TestCase):
             "assignments": ExpertAssignment.objects.count(),
             "consents": FarmDataConsent.objects.count(),
             "notifications": Notification.objects.count(),
+            "crop_diseases": CropDisease.objects.count(),
+            "disease_guidance": DiseaseGuidance.objects.count(),
         }
+        DiseaseGuidance.objects.order_by("pk").first().delete()
         call_command("seed_demo", verbosity=0)
 
         users = User.objects.filter(email__in=self.demo_emails)
@@ -48,6 +52,14 @@ class SeedDemoCommandTests(TestCase):
         self.assertEqual(Farm.objects.filter(owner__email="salma.farmer@farmtime.test", name="Salma Vegetable Farm").count(), 1)
         self.assertTrue(User.objects.get(email="farmer@farmtime.test").check_password("FarmDemo@2026!"))
         self.assertTrue(User.objects.get(email="salma.farmer@farmtime.test").check_password("FarmDemo@2026!"))
+        self.assertFalse(users.filter(phone_number="").exists())
+        self.assertFalse(
+            FarmerProfile.objects.filter(user__email__in=self.demo_emails, bio="").exists()
+        )
+        self.assertTrue(DataSource.objects.filter(name="NASA POWER Agroclimatology", is_active=True).exists())
+        self.assertEqual(CropDisease.objects.values("crop_name").distinct().count(), 42)
+        self.assertEqual(CropDisease.objects.count(), 858)
+        self.assertEqual(DiseaseGuidance.objects.count(), 3047)
         self.assertEqual(FarmTask.objects.filter(title="Inspect field drainage").count(), 1)
         self.assertEqual(FarmTask.objects.filter(farm__owner__email="salma.farmer@farmtime.test").count(), 2)
         salma_scenario = SimulationScenario.objects.get(
@@ -74,6 +86,8 @@ class SeedDemoCommandTests(TestCase):
                 "assignments": ExpertAssignment.objects.count(),
                 "consents": FarmDataConsent.objects.count(),
                 "notifications": Notification.objects.count(),
+                "crop_diseases": CropDisease.objects.count(),
+                "disease_guidance": DiseaseGuidance.objects.count(),
             },
             first_counts,
         )

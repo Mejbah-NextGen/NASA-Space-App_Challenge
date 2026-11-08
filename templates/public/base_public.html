@@ -29,6 +29,7 @@
         <a href="{% url 'weather:public_weather' %}">{{ public_ui.nav_weather }}</a>
         <a href="{% url 'agricultural_data:public_history' %}">{{ public_ui.nav_history }}</a>
         <a href="{% url 'agricultural_data:crop_insights' %}">{{ public_ui.nav_crop_insights }}</a>
+        <a href="{% url 'agricultural_data:crop_health' %}">Crop Health</a>
         <a href="{% url 'core:how_it_works' %}">{{ public_ui.nav_how_it_works }}</a>
         <a href="{% url 'core:about' %}">{{ public_ui.nav_about }}</a>
         <form action="{% url 'set_language' %}" method="post" class="language-form">
@@ -64,7 +65,7 @@
         <a class="brand brand-light" href="{% url 'core:home' %}"><span class="brand-mark">FT</span><strong>{{ public_ui.brand_name }}</strong></a>
         <p>{{ public_ui.footer_summary }}</p>
       </div>
-      <div><h2>{{ public_ui.footer_explore }}</h2><a href="{% url 'weather:public_weather' %}">{{ public_ui.nav_weather }}</a><a href="{% url 'agricultural_data:public_history' %}">{{ public_ui.nav_history }}</a><a href="{% url 'learning:list' %}">{{ public_ui.footer_learning }}</a></div>
+      <div><h2>{{ public_ui.footer_explore }}</h2><a href="{% url 'weather:public_weather' %}">{{ public_ui.nav_weather }}</a><a href="{% url 'agricultural_data:public_history' %}">{{ public_ui.nav_history }}</a><a href="{% url 'agricultural_data:crop_health' %}">Crop Health Library</a><a href="{% url 'learning:list' %}">{{ public_ui.footer_learning }}</a></div>
       <div><h2>{{ public_ui.footer_platform }}</h2><a href="{% url 'core:about' %}">{{ public_ui.nav_about }}</a><a href="{% url 'core:how_it_works' %}">{{ public_ui.nav_how_it_works }}</a><a href="{% url 'agricultural_data:data_sources' %}">{{ public_ui.footer_data_sources }}</a></div>
       <div><h2>{{ public_ui.footer_support }}</h2><a href="{% url 'core:help' %}">{{ public_ui.footer_help }}</a><a href="{% url 'core:contact' %}">{{ public_ui.footer_contact }}</a><a href="{% url 'core:privacy' %}">{{ public_ui.footer_privacy }}</a><a href="{% url 'core:terms' %}">{{ public_ui.footer_terms }}</a></div>
     </div>
